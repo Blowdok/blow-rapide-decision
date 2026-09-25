@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PROFILS } from '../../partage/reglages';
+import { PROFILS, type Theme, THEMES } from '../../partage/reglages';
 import type { IdProfil } from '../../partage/types';
 import { messageErreur } from './api';
 import { Message } from './composants';
@@ -67,6 +67,34 @@ function SelecteurMode() {
   );
 }
 
+/** Thème de l'interface, appliqué tout de suite et mémorisé. */
+function SelecteurTheme() {
+  const { etat, enregistrerReglages } = useApplication();
+  if (!etat) return null;
+  const actuel = etat.reglages.apparence.theme;
+  return (
+    <div className="theme">
+      <span className="theme-libelle" id="libelle-theme">
+        Thème
+      </span>
+      <div className="segments segments-compacts" role="radiogroup" aria-labelledby="libelle-theme">
+        {(Object.keys(THEMES) as Theme[]).map((theme) => (
+          <button
+            key={theme}
+            type="button"
+            role="radio"
+            aria-checked={actuel === theme}
+            className={actuel === theme ? 'segment actif' : 'segment'}
+            onClick={() => void enregistrerReglages({ apparence: { theme } })}
+          >
+            {THEMES[theme]}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function App() {
   const [onglet, definirOnglet] = useState<Onglet>('documents');
   const { erreurDemarrage } = useApplication();
@@ -91,6 +119,7 @@ export function App() {
             </button>
           ))}
         </nav>
+        <SelecteurTheme />
       </aside>
       <div className="zone-principale">
         <header className="entete">

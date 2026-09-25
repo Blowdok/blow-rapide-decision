@@ -52,3 +52,11 @@ describe('réglages abîmés', () => {
     expect(reglages.classement.seuilConfiance).toBe(REGLAGES_PAR_DEFAUT.classement.seuilConfiance);
   });
 });
+
+describe('thème', () => {
+  it('suit le système par défaut et refuse un thème inconnu', () => {
+    expect(REGLAGES_PAR_DEFAUT.apparence.theme).toBe('systeme');
+    expect(fusionnerReglages(REGLAGES_PAR_DEFAUT, { apparence: { theme: 'sombre' } }).apparence.theme).toBe('sombre');
+    expect(fusionnerReglages(REGLAGES_PAR_DEFAUT, { apparence: { theme: 'fluo' as never } }).apparence.theme).toBe('systeme');
+  });
+});

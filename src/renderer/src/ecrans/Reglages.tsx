@@ -113,10 +113,13 @@ export function EcranReglages() {
   const [journal, definirJournal] = useState<EntreeJournal[]>([]);
   const [message, definirMessage] = useState<{ type: 'succes' | 'erreur'; texte: string } | null>(null);
 
-  // Un changement de mode (en-tête) ne doit pas effacer les modifications en cours.
+  // Mode (en-tête) et thème (barre latérale) se règlent ailleurs : les suivre sans
+  // effacer les modifications en cours.
   useEffect(() => {
     if (!etat) return;
-    definirBrouillon((actuel) => (actuel ? { ...actuel, profil: etat.reglages.profil } : etat.reglages));
+    definirBrouillon((actuel) =>
+      actuel ? { ...actuel, profil: etat.reglages.profil, apparence: etat.reglages.apparence } : etat.reglages
+    );
   }, [etat]);
 
   useEffect(() => {
@@ -134,7 +137,7 @@ export function EcranReglages() {
   const enregistrer = async () => {
     definirMessage(null);
     try {
-      const { profil: _profil, ...sections } = brouillon;
+      const { profil: _profil, apparence: _apparence, ...sections } = brouillon;
       // Les valeurs hors limites reviennent bornées : le brouillon reprend l'état enregistré.
       definirBrouillon((await enregistrerReglages(sections)).reglages);
       definirMessage({ type: 'succes', texte: 'Réglages enregistrés.' });

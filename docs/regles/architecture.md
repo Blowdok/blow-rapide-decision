@@ -38,7 +38,7 @@ Application de bureau Electron en TypeScript. Le cœur, sans Electron, extrait l
   - `configuration.ts` (variables d'environnement de la ligne de commande), `diagnostic.ts` (état d'Ollama, d'OpenRouter et de Jev, sans appel payant).
 - `src/main/` : processus principal d'Electron. `index.ts` (fenêtre, menu), `ipc.ts` (canaux), `service.ts` (corpus ouvert, caches, journal des envois ; sans Electron), `stockage.ts` (réglages, clés chiffrées).
 - `src/preload/` : expose l'API `window.brd`, et rien d'autre.
-- `src/renderer/` : interface React en français : Documents, Recherche, Comparaison, Réglages.
+- `src/renderer/` : interface React en français : Documents, Recherche, Comparaison, Réglages. Le thème (clair, sombre, système) est imposé par le processus principal via `nativeTheme.themeSource`, que suit la requête CSS `prefers-color-scheme`.
 - `src/cli/` : ligne de commande `brd` (comparer, trier, chercher, résumer, diagnostic).
 - `jeux-evaluation/demo/` : jeu d'évaluation fictif (12 documents, attentes dans `jeu.json`).
 - `tests/` (Vitest) et `tests-e2e/` (Playwright sur l'application construite).

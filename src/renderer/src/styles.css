@@ -212,6 +212,31 @@ nav {
   flex: 1;
 }
 
+/* Sélecteur de thème, en bas de la barre latérale */
+
+.theme {
+  margin-top: auto;
+  padding: 0 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.theme-libelle {
+  color: var(--texte-2);
+  font-size: 0.8rem;
+}
+
+.segments-compacts {
+  display: flex;
+}
+
+.segments-compacts .segment {
+  flex: 1;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.8rem;
+}
+
 /* Sélecteur de mode */
 
 .mode {
@@ -519,7 +544,7 @@ tr.importante td {
 }
 
 .documents td:first-child {
-  min-width: 15rem;
+  min-width: 12rem;
 }
 
 .documents td:not(:first-child) {

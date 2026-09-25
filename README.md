@@ -26,6 +26,7 @@ Architecture détaillée : [docs/regles/architecture.md](docs/regles/architectur
   - **Référence sans IA** : heuristiques lexicales, pour mesurer l'apport réel de l'IA.
 - **Comparaison** (banc de décision) : fait passer un jeu d'évaluation à chaque mode et recommande local ou hybride selon la qualité, le temps, le coût et les données envoyées ([RAD 0004](docs/regles/decisions/0004-banc-de-decision.md)). Rapport exportable en Markdown et JSON.
 - **Réglages** : modèles, clés API chiffrées par le système, catégories modifiables, seuils, diagnostic des services, journal des envois hors de la machine.
+- **Thème** clair, sombre ou celui du système, au choix en bas de la barre latérale ; le choix est mémorisé.
 - **Ligne de commande `brd`** : comparer, trier, chercher, résumer, diagnostic.
 
 ## Installation
@@ -79,7 +80,7 @@ Automatiques :
 
 ```bash
 npm run typecheck
-npm test                # 105 tests : cœur, moteurs, agent, banc, ligne de commande, service
+npm test                # cœur, moteurs, agent, banc, ligne de commande, service, stockage
 npm run test:e2e        # parcours de l'application réelle (Linux sans écran : xvfb-run -a npm run test:e2e)
 ```
 

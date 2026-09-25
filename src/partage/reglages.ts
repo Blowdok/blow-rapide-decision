@@ -4,9 +4,17 @@ import type { Categorie, IdProfil } from './types';
 
 export type AccesJev = 'openrouter' | 'typesafe';
 
+/** Thème de l'interface : celui du système, ou imposé. */
+export type Theme = 'systeme' | 'clair' | 'sombre';
+
+export const THEMES: Record<Theme, string> = { systeme: 'Système', clair: 'Clair', sombre: 'Sombre' };
+
 export interface Reglages {
   /** Mode utilisé par l'application. */
   profil: IdProfil;
+  apparence: {
+    theme: Theme;
+  };
   ollama: {
     url: string;
     modeleDecision: string;
@@ -67,6 +75,7 @@ export const CATEGORIES_PAR_DEFAUT: Categorie[] = [
 
 export const REGLAGES_PAR_DEFAUT: Reglages = {
   profil: 'local',
+  apparence: { theme: 'systeme' },
   ollama: { url: 'http://127.0.0.1:11434', modeleDecision: 'qwen3:8b', modeleResume: 'qwen3:8b', contexte: 8192 },
   openrouter: { modeleResume: '~anthropic/claude-sonnet-latest', refuserCollecte: true, exigerZdr: false },
   jev: { acces: 'openrouter', modele: 'jev-latest' },
@@ -107,6 +116,7 @@ const fini = (valeur: unknown, base: number): number => (typeof valeur === 'numb
 export function fusionnerReglages(base: Reglages, partiel: ReglagesPartiels = {}): Reglages {
   const r: Reglages = {
     profil: partiel.profil && partiel.profil in PROFILS ? partiel.profil : base.profil,
+    apparence: { ...base.apparence, ...partiel.apparence },
     ollama: { ...base.ollama, ...partiel.ollama },
     openrouter: { ...base.openrouter, ...partiel.openrouter },
     jev: { ...base.jev, ...partiel.jev },
@@ -125,6 +135,7 @@ export function fusionnerReglages(base: Reglages, partiel: ReglagesPartiels = {}
   );
   r.resume.maxJetons = Math.round(borner(fini(r.resume.maxJetons, base.resume.maxJetons), 100, 8000));
   if (r.jev.acces !== 'openrouter' && r.jev.acces !== 'typesafe') r.jev.acces = base.jev.acces;
+  if (!(r.apparence.theme in THEMES)) r.apparence.theme = base.apparence.theme;
   // Catégories : identifiant et libellé obligatoires, identifiants uniques.
   const vues = new Set<string>();
   r.classement.categories = r.classement.categories
