@@ -9,11 +9,18 @@ import type { Theme } from '../partage/reglages';
 import { brancherCanaux } from './ipc';
 import { ServiceAgent } from './service';
 import { type Chiffreur, Stockage } from './stockage';
+import { configurerTrousseauLinux } from './trousseau-linux';
 
 let fenetrePrincipale: BrowserWindow | null = null;
 
 // Dossier de données personnalisé (tests, usage portable) ; sinon le dossier du système.
 if (process.env.BRD_DOSSIER_DONNEES) app.setPath('userData', process.env.BRD_DOSSIER_DONNEES);
+
+configurerTrousseauLinux({
+  platform: process.platform,
+  xdgCurrentDesktop: process.env.XDG_CURRENT_DESKTOP,
+  ajouterSwitch: (nom, valeur) => app.commandLine.appendSwitch(nom, valeur)
+});
 
 /** Chiffrement du système ; sous Linux sans trousseau, le repli « basic_text » est refusé. */
 const chiffreur: Chiffreur = {
