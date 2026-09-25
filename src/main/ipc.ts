@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { app, type BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent, shell } from 'electron';
 import { nomDuRapport } from '../coeur/banc/rapport';
 import { CANAUX, type EtatReglages, type NomCle, type Reponse } from '../partage/contrat';
-import { IDS_PROFILS, type ReglagesPartiels, type Secrets } from '../partage/reglages';
+import { IDS_PROFILS, type ReglagesPartiels, type Secrets, type Theme } from '../partage/reglages';
 import type { IdProfil } from '../partage/types';
 import type { ServiceAgent } from './service';
 import type { Stockage } from './stockage';
@@ -17,6 +17,7 @@ export interface OptionsCanaux {
   fenetre: () => BrowserWindow | null;
   cheminJeuDemo: string;
   secretsEnvironnement: Secrets;
+  appliquerTheme: (theme: Theme) => void;
 }
 
 function texte(valeur: unknown, nom: string): string {
@@ -81,7 +82,8 @@ export function brancherCanaux(options: OptionsCanaux): void {
 
   gerer(CANAUX.reglagesLire, () => etatReglages());
   gerer(CANAUX.reglagesEnregistrer, (partiel) => {
-    stockage.enregistrerReglages(objet(partiel, 'réglages') as ReglagesPartiels);
+    const reglages = stockage.enregistrerReglages(objet(partiel, 'réglages') as ReglagesPartiels);
+    options.appliquerTheme(reglages.apparence.theme);
     return etatReglages();
   });
   gerer(CANAUX.reglagesDefinirCle, (nom, valeur) => {

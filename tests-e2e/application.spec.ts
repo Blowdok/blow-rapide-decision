@@ -29,6 +29,8 @@ test.beforeAll(async () => {
   application = await electron.launch({
     // Le bac à sable de Chromium refuse l'utilisateur root (conteneurs d'intégration continue).
     args: [RACINE, ...(process.getuid?.() === 0 ? ['--no-sandbox'] : [])],
+    // Playwright imposerait sinon un thème clair : c'est l'application qui doit décider.
+    colorScheme: null,
     env: {
       ...process.env,
       BRD_DOSSIER_DONNEES: donnees,
@@ -98,4 +100,33 @@ test('vérifie les services depuis les réglages', async () => {
   await expect(fenetre.locator('.diagnostic li')).toHaveCount(3);
   await expect(fenetre.locator('.diagnostic')).toContainText('Clé absente : le mode hybride est indisponible.');
   await capturer('05-reglages');
+});
+
+test('bascule le thème : sombre, clair, puis système', async () => {
+  const sombre = () =>
+    fenetre.evaluate(
+      () =>
+        (globalThis as unknown as { matchMedia(requete: string): { matches: boolean } }).matchMedia(
+          '(prefers-color-scheme: dark)'
+        ).matches
+    );
+  const themeEnregistre = () =>
+    fenetre.evaluate(async () => (await (globalThis as unknown as { brd: ApiBureau }).brd.reglages.lire()).reglages.apparence.theme);
+  const theme = fenetre.getByRole('radiogroup', { name: 'Thème' });
+
+  await fenetre.getByRole('button', { name: /^Documents/ }).click();
+  await theme.getByRole('radio', { name: 'Sombre' }).click();
+  await expect(theme.getByRole('radio', { name: 'Sombre' })).toHaveAttribute('aria-checked', 'true');
+  await expect.poll(sombre).toBe(true);
+  expect(await themeEnregistre()).toBe('sombre');
+  await capturer('06-documents-sombre');
+  await fenetre.getByRole('button', { name: /^Comparaison/ }).click();
+  await capturer('07-comparaison-sombre');
+
+  await theme.getByRole('radio', { name: 'Clair' }).click();
+  await expect.poll(sombre).toBe(false);
+
+  await theme.getByRole('radio', { name: 'Système' }).click();
+  await expect(theme.getByRole('radio', { name: 'Système' })).toHaveAttribute('aria-checked', 'true');
+  expect(await themeEnregistre()).toBe('systeme');
 });
