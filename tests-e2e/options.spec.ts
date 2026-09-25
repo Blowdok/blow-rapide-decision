@@ -28,6 +28,17 @@ let lenteurOcrMs = 0;
 /** Bouton du menu latéral : les écrans restent montés, et l'aide contient aussi des liens « Documents »… */
 const menu = (nom: RegExp) => fenetre.getByRole('navigation', { name: 'Écrans' }).getByRole('button', { name: nom });
 
+/**
+ * Éléments visibles avec lesquels on agit (boutons, champs, liens, choix) et
+ * qui n'ont pas de bulle d'information, sur l'écran affiché.
+ */
+function elementsSansInfobulle(): Promise<string[]> {
+  // Évalué dans la page : les tests sont typés sans le DOM.
+  return fenetre.evaluate(`[...document.querySelectorAll('button, input, select, textarea, a[href], summary, [role="radio"]')]
+    .filter((e) => e.getClientRects().length > 0 && !e.closest('[data-infobulle]'))
+    .map((e) => (e.getAttribute('aria-label') ?? e.textContent ?? e.tagName).trim().slice(0, 60))`);
+}
+
 async function capturer(nom: string): Promise<void> {
   if (CAPTURES) await fenetre.screenshot({ path: join(CAPTURES, `${nom}.png`) });
 }
@@ -107,6 +118,7 @@ test('lit le PDF scanné par OCR et prépare la recherche sémantique', async ()
   await expect(fenetre.locator('.fiche .meta')).toContainText('1 page(s) lue(s) par OCR');
   await fenetre.locator('.fiche summary').click();
   await expect(fenetre.locator('.apercu')).toContainText('Montant : 1 234 €');
+  expect(await elementsSansInfobulle()).toEqual([]);
   await capturer('options-01-documents');
 });
 
@@ -118,6 +130,7 @@ test('trouve un document par le sens, sans mot commun', async () => {
   const premier = fenetre.locator('.resultat').first();
   await expect(premier).toContainText('bulletin-septembre.txt');
   await expect(premier).toContainText('Trouvé par le sens');
+  expect(await elementsSansInfobulle()).toEqual([]);
   await capturer('options-02-recherche');
 });
 
@@ -143,6 +156,7 @@ test('annule une lecture OCR trop longue, même après un détour par l’aide',
   await expect(fenetre.getByRole('heading', { name: 'Aide', exact: true })).toBeVisible();
   await menu(/^Documents/).click();
   await expect(fenetre.getByText('Lecture OCR de releve-scanne.pdf : page 1 sur 1')).toBeVisible();
+  expect(await elementsSansInfobulle()).toEqual([]);
   await capturer('options-04-lecture-ocr');
   await fenetre.getByRole('button', { name: 'Annuler', exact: true }).click();
   await expect(fenetre.getByText('Lecture du dossier annulée.')).toBeVisible();

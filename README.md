@@ -22,6 +22,7 @@ L'interface s'adresse à un débutant ([RAD 0006](docs/regles/decisions/0006-int
 
 - au premier lancement, un **accueil en trois étapes** vérifie que l'agent est prêt et dit quoi faire sinon ;
 - un écran **Aide** répond aux questions courantes : quel mode choisir, installer Ollama, obtenir une clé ;
+- chaque bouton, libellé ou pastille s'explique dans une **bulle d'information**, au survol ou au clavier ;
 - les réglages techniques restent repliés.
 
 - **Documents** : indexe un dossier (TXT, Markdown, PDF avec texte, Word), sur la machine, sans rien envoyer.

@@ -24,6 +24,17 @@ let donnees: string;
 /** Bouton du menu latéral : les écrans restent montés, et l'aide contient aussi des liens « Documents »… */
 const menu = (nom: RegExp) => fenetre.getByRole('navigation', { name: 'Écrans' }).getByRole('button', { name: nom });
 
+/**
+ * Éléments visibles avec lesquels on agit (boutons, champs, liens, choix) et
+ * qui n'ont pas de bulle d'information, sur l'écran affiché.
+ */
+function elementsSansInfobulle(): Promise<string[]> {
+  // Évalué dans la page : les tests sont typés sans le DOM.
+  return fenetre.evaluate(`[...document.querySelectorAll('button, input, select, textarea, a[href], summary, [role="radio"]')]
+    .filter((e) => e.getClientRects().length > 0 && !e.closest('[data-infobulle]'))
+    .map((e) => (e.getAttribute('aria-label') ?? e.textContent ?? e.tagName).trim().slice(0, 60))`);
+}
+
 async function capturer(nom: string): Promise<void> {
   if (CAPTURES) await fenetre.screenshot({ path: join(CAPTURES, `${nom}.png`) });
 }
@@ -61,6 +72,7 @@ test('accueille le débutant en trois étapes, en mode local par défaut', async
   await expect(fenetre.locator('.preparation-verdict:visible')).toContainText(/Prêt|À faire/);
   await expect(fenetre.getByRole('button', { name: 'Vérifier à nouveau' })).toBeVisible();
   await expect(fenetre.getByRole('button', { name: 'Choisir un dossier…' })).toBeVisible();
+  expect(await elementsSansInfobulle()).toEqual([]);
   await capturer('01-accueil');
 });
 
@@ -83,6 +95,8 @@ test('indexe la démo, trie et résume en mode référence', async () => {
   await expect(fenetre.getByRole('heading', { name: 'Résumé' })).toBeVisible();
   await expect(fenetre.locator('.texte-resume')).toContainText('180 € HT par mois');
   await expect(fenetre.getByText(/rien n’a quitté ce PC/).first()).toBeVisible();
+  await fenetre.locator('.fiche summary').click();
+  expect(await elementsSansInfobulle()).toEqual([]);
   await capturer('02-documents');
 });
 
@@ -95,6 +109,7 @@ test('cherche un passage, d’abord avec une question d’exemple', async () => 
   await fenetre.getByRole('searchbox', { name: 'Requête' }).fill('date limite pour payer la taxe foncière');
   await fenetre.getByRole('button', { name: 'Chercher' }).click();
   await expect(fenetre.locator('.resultat').first()).toContainText('avis-taxe-fonciere-2026.txt');
+  expect(await elementsSansInfobulle()).toEqual([]);
   await capturer('03-recherche');
 });
 
@@ -105,6 +120,8 @@ test('compare les modes et explique pourquoi aucun mode IA n’a tourné', async
   await expect(fenetre.getByRole('heading', { name: 'Aucun mode IA n’a pu tourner' })).toBeVisible({ timeout: 60_000 });
   await expect(fenetre.getByText(/Mode Hybride indisponible : Clé OpenRouter manquante/)).toBeVisible();
   await expect(fenetre.getByRole('row', { name: /Indice de qualité/ })).toBeVisible();
+  for (const resume of await fenetre.locator('.bloc > summary:visible').all()) await resume.click();
+  expect(await elementsSansInfobulle()).toEqual([]);
   await capturer('04-comparaison');
 });
 
@@ -127,6 +144,7 @@ test('garde les options facultatives désactivées, et avance sans leurs modèle
   // Option activée, mais Ollama injoignable : l'indexation aboutit quand même, avec un avis.
   await semantique.check();
   await fenetre.getByRole('checkbox', { name: 'Afficher les réglages avancés' }).check();
+  expect(await elementsSansInfobulle()).toEqual([]);
   await fenetre.getByRole('textbox', { name: 'Adresse du serveur' }).fill('http://127.0.0.1:9');
   await fenetre.locator('.titre-ecran').getByRole('button', { name: 'Enregistrer' }).click();
   await expect(fenetre.getByText('Réglages enregistrés.')).toBeVisible();
@@ -151,7 +169,29 @@ test('ouvre l’aide sur la bonne question', async () => {
   await expect(fenetre.locator('#aide-modes')).toContainText('Référence sans IA');
   await fenetre.getByText('Installer Ollama (mode Local)').click();
   await expect(fenetre.locator('#aide-ollama .commande code')).toHaveText('ollama pull qwen3.5:4b');
+  // Toutes les réponses ouvertes : leurs boutons et leurs liens passent aussi à l'audit.
+  const questions = fenetre.locator('details.question');
+  for (let i = 0; i < (await questions.count()); i++) {
+    const question = questions.nth(i);
+    if ((await question.getAttribute('open')) === null) await question.locator('summary').click();
+  }
+  expect(await elementsSansInfobulle()).toEqual([]);
   await capturer('07-aide');
+});
+
+test('explique chaque bouton dans une bulle, au survol comme au clavier', async () => {
+  await menu(/^Documents/).click();
+  const bulle = fenetre.getByRole('tooltip');
+  await fenetre.getByRole('button', { name: 'Actualiser' }).hover();
+  await expect(bulle).toHaveText('Relit le dossier : fichiers ajoutés ou modifiés, options activées dans Réglages.');
+  await capturer('08-infobulle');
+  // Au clavier, la bulle vient tout de suite ; les lecteurs d'écran la lisent comme description.
+  const changer = fenetre.getByRole('button', { name: 'Changer de dossier…' });
+  await changer.focus();
+  await expect(bulle).toHaveText('Choisir un autre dossier de documents.');
+  await expect(changer).toHaveAccessibleDescription('Choisir un autre dossier de documents.');
+  await fenetre.keyboard.press('Escape');
+  await expect(bulle).toHaveCount(0);
 });
 
 test('bascule le thème : sombre, clair, puis système', async () => {
@@ -171,9 +211,9 @@ test('bascule le thème : sombre, clair, puis système', async () => {
   await expect(theme.getByRole('radio', { name: 'Sombre' })).toHaveAttribute('aria-checked', 'true');
   await expect.poll(sombre).toBe(true);
   expect(await themeEnregistre()).toBe('sombre');
-  await capturer('08-documents-sombre');
+  await capturer('09-documents-sombre');
   await menu(/^Comparaison/).click();
-  await capturer('09-comparaison-sombre');
+  await capturer('10-comparaison-sombre');
 
   await theme.getByRole('radio', { name: 'Clair' }).click();
   await expect.poll(sombre).toBe(false);

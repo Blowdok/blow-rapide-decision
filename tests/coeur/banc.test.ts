@@ -15,6 +15,7 @@ import type { MoteurDecision } from '../../src/coeur/moteurs/types';
 import type { JeuEvaluation, ProgressionBanc, ResultatProfil } from '../../src/partage/banc';
 import { fusionnerReglages, REGLAGES_PAR_DEFAUT } from '../../src/partage/reglages';
 import type { IdProfil } from '../../src/partage/types';
+import { lignesSynthese } from '../../src/partage/synthese';
 import { dossierTemporaire } from '../outils/fabriques';
 import { ollamaPlongementsSimule } from '../outils/plongements';
 
@@ -265,6 +266,14 @@ function profil(id: IdProfil, qualite: number | null, extra: Partial<ResultatPro
     metriques: { ...metriques, ...extra, qualite }
   };
 }
+
+describe('synthèse du banc', () => {
+  it('explique chaque critère en langage simple, pour sa bulle d’information', () => {
+    const lignes = lignesSynthese([profil('local', 80), profil('hybride', null)]);
+    expect(lignes.length).toBeGreaterThan(20);
+    for (const ligne of lignes) expect(ligne.aide, ligne.libelle).toMatch(/^\p{Lu}.{15,}[.…]$/u);
+  });
+});
 
 describe('recommandation', () => {
   const hybrideCher = {

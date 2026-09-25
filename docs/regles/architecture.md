@@ -44,6 +44,7 @@ Application de bureau Electron en TypeScript. Le cœur, sans Electron, extrait l
   - Écrans : Documents (avec un accueil en trois étapes), Recherche, Comparaison, Réglages (essentiel d'abord, réglages avancés repliés) et Aide. Ils restent montés et seul l'écran affiché est visible : une lecture de dossier, une comparaison ou des réglages en cours survivent à un changement d'écran.
   - `preparation.tsx` vérifie, sans appel payant, les services utiles au mode choisi, puis dit quoi faire.
   - `contexte.tsx` porte l'état partagé et la navigation : un lien « Comment faire ? » ouvre l'aide sur la bonne question.
+  - `infobulles.tsx` affiche la bulle d'information de tout élément qui porte `data-infobulle`, au survol comme au clavier.
   - Le thème (clair, sombre, système) est imposé par le processus principal via `nativeTheme.themeSource`, que suit la requête CSS `prefers-color-scheme`.
 - `src/cli/` : ligne de commande `brd` (comparer, trier, chercher, résumer, diagnostic).
 - `jeux-evaluation/demo/` : jeu d'évaluation fictif (12 documents, attentes dans `jeu.json`).
