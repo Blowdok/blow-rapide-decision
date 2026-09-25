@@ -32,6 +32,7 @@ Mise à jour : 25 septembre 2026. À lire au début de chaque session, à mettre
   - limite de pages consommée par les pages blanches.
 - 25 septembre 2026, à la demande de Blowdok, la PR #1 est fusionnée dans `main`.
 - 25 septembre 2026, à la demande de Blowdok (« N'oublie pas les bulles d'informations au survol des boutons, icônes, libellé… »), chaque bouton, champ, lien, pastille et critère s'explique dans une bulle ([RAD 0006](decisions/0006-interface-pour-debutant.md)). À sa demande, ce travail est fusionné dans `main` (PR #2).
+- 25 septembre 2026, essai depuis un clone neuf : `npm start` échouait (« Electron uninstall »), car Electron 44 ne télécharge plus son binaire à l'installation. Désormais, `npm install` le télécharge, et `npm run dev` ou `npm start` le vérifient avant de démarrer. Après ce correctif, `git clone`, `npm install` puis `npm start` ouvrent l'application.
 - Vérifications : typage, 166 tests unitaires, les 9 étapes du parcours de bout en bout de l'application et les 4 étapes du parcours des options (face à un faux serveur Ollama) passent. Les parcours vérifient, écran par écran, qu'aucun élément avec lequel on agit n'est sans bulle.
 - Aucun essai réel avec Ollama, OpenRouter ou Jev : l'environnement de construction n'avait ni serveur Ollama ni clé API. Seuls le mode référence et des réponses simulées au format documenté ont tourné.
 
