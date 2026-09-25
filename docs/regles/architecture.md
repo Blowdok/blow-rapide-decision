@@ -1,6 +1,6 @@
 # Architecture de blow-rapide-decision
 
-Mise à jour : 25 septembre 2026. Choix structurants : [RAD 0002](decisions/0002-application-de-bureau-electron.md) (stack), [RAD 0003](decisions/0003-jev-decide-un-llm-redige.md) (modes et moteurs), [RAD 0004](decisions/0004-banc-de-decision.md) (banc de décision), [RAD 0005](decisions/0005-options-semantique-et-ocr.md) (options sémantique et OCR).
+Mise à jour : 25 septembre 2026. Choix structurants : [RAD 0002](decisions/0002-application-de-bureau-electron.md) (stack), [RAD 0003](decisions/0003-jev-decide-un-llm-redige.md) (modes et moteurs), [RAD 0004](decisions/0004-banc-de-decision.md) (banc de décision), [RAD 0005](decisions/0005-options-semantique-et-ocr.md) (options sémantique et OCR), [RAD 0006](decisions/0006-interface-pour-debutant.md) (interface pour débutant).
 
 ## Vue d'ensemble
 
@@ -40,7 +40,11 @@ Application de bureau Electron en TypeScript. Le cœur, sans Electron, extrait l
   - `configuration.ts` (variables d'environnement de la ligne de commande), `diagnostic.ts` (état d'Ollama, modèles des options compris, d'OpenRouter et de Jev, sans appel payant), `options.ts` (moteurs des options actives).
 - `src/main/` : processus principal d'Electron. `index.ts` (fenêtre, menu), `ipc.ts` (canaux), `service.ts` (corpus ouvert, caches, journal des envois ; sans Electron), `stockage.ts` (réglages, clés chiffrées).
 - `src/preload/` : expose l'API `window.brd`, et rien d'autre.
-- `src/renderer/` : interface React en français : Documents, Recherche, Comparaison, Réglages. Le thème (clair, sombre, système) est imposé par le processus principal via `nativeTheme.themeSource`, que suit la requête CSS `prefers-color-scheme`.
+- `src/renderer/` : interface React en français, pensée pour un débutant ([RAD 0006](decisions/0006-interface-pour-debutant.md)).
+  - Écrans : Documents (avec un accueil en trois étapes), Recherche, Comparaison, Réglages (essentiel d'abord, réglages avancés repliés) et Aide.
+  - `preparation.tsx` vérifie, sans appel payant, les services utiles au mode choisi, puis dit quoi faire.
+  - `contexte.tsx` porte l'état partagé et la navigation : un lien « Comment faire ? » ouvre l'aide sur la bonne question.
+  - Le thème (clair, sombre, système) est imposé par le processus principal via `nativeTheme.themeSource`, que suit la requête CSS `prefers-color-scheme`.
 - `src/cli/` : ligne de commande `brd` (comparer, trier, chercher, résumer, diagnostic).
 - `jeux-evaluation/demo/` : jeu d'évaluation fictif (12 documents, attentes dans `jeu.json`).
 - `tests/` (Vitest) et `tests-e2e/` (Playwright sur l'application construite).

@@ -2,23 +2,24 @@ import { useEffect, useMemo, useState } from 'react';
 import type { DetailDocument, Progression } from '../../../partage/contrat';
 import { formaterEntier, formaterPourcentage } from '../../../partage/format';
 import { api, messageErreur } from '../api';
-import { BarreProgression, BilanMesures, Jauge, Message, Pastille, Urgence } from '../composants';
+import { BarreProgression, BilanMesures, Jauge, Message, MessageErreur, Pastille, Urgence } from '../composants';
 import { useApplication } from '../contexte';
+import { EtatPreparation } from '../preparation';
 
-type Operation = 'indexation' | 'triage' | 'resume' | null;
+type Operation = 'lecture' | 'classement' | 'resume' | null;
 
 const taille = (octets: number): string =>
   octets < 1024 ? `${octets} o` : octets < 1_048_576 ? `${formaterEntier(octets / 1024)} Ko` : `${(octets / 1_048_576).toFixed(1).replace('.', ',')} Mo`;
 
-/** Avancement de l'indexation : fichiers, pages lues par OCR, puis plongements (options). */
-function AvancementIndexation({ progression, annuler }: { progression: Progression | null; annuler: () => void }) {
+/** Avancement de la lecture du dossier : fichiers, pages scannées (OCR), puis recherche par le sens (options). */
+function AvancementLecture({ progression, annuler }: { progression: Progression | null; annuler: () => void }) {
   if (progression?.type !== 'indexation') return null;
   const libelle =
     progression.etape === 'plongements'
-      ? 'Recherche sémantique : calcul des vecteurs des passages'
+      ? 'Préparation de la recherche par le sens'
       : progression.ocr
         ? `Lecture OCR de ${progression.fichier} : page ${progression.ocr.page} sur ${progression.ocr.pages}`
-        : `Indexation : ${progression.fichier}`;
+        : `Lecture du dossier : ${progression.fichier}`;
   return (
     <div className="avancement">
       <BarreProgression fait={progression.traites} total={progression.total} libelle={libelle} />
@@ -30,7 +31,7 @@ function AvancementIndexation({ progression, annuler }: { progression: Progressi
 }
 
 export function EcranDocuments() {
-  const { etat, corpus, definirCorpus, rafraichirCorpus, progression } = useApplication();
+  const { etat, corpus, definirCorpus, rafraichirCorpus, progression, allerA } = useApplication();
   const [operation, definirOperation] = useState<Operation>(null);
   const [erreur, definirErreur] = useState<string | null>(null);
   const [selection, definirSelection] = useState<string | null>(null);
@@ -44,7 +45,7 @@ export function EcranDocuments() {
     [etat?.reglages.classement.categories]
   );
 
-  // Les triages et résumés dépendent du mode : on recharge quand il change.
+  // Les classements et résumés dépendent du mode : on recharge quand il change.
   useEffect(() => {
     if (profil) void rafraichirCorpus();
   }, [profil, rafraichirCorpus]);
@@ -69,25 +70,25 @@ export function EcranDocuments() {
     }
   };
 
-  const indexer = (chemin: string) =>
-    executer('indexation', async () => {
+  const lireDossier = (chemin: string) =>
+    executer('lecture', async () => {
       const nouveau = await api.dossier.indexer(chemin);
       definirSelection(null);
       definirCorpus(nouveau);
     });
-  const annulerIndexation = () => void api.dossier.annuler();
+  const annulerLecture = () => void api.dossier.annuler();
 
   const choisirDossier = async () => {
     const chemin = await api.dossier.choisir();
-    if (chemin) await indexer(chemin);
+    if (chemin) await lireDossier(chemin);
   };
 
-  const trier = (ids?: string[]) =>
-    executer('triage', async () => {
+  const classer = (ids?: string[]) =>
+    executer('classement', async () => {
       try {
         await api.documents.trier(ids);
       } finally {
-        // Les triages réussis avant une éventuelle erreur restent affichés.
+        // Les documents classés avant une éventuelle erreur restent affichés.
         await rafraichirCorpus();
       }
     });
@@ -100,6 +101,7 @@ export function EcranDocuments() {
 
   const documents = corpus?.documents ?? [];
   const restants = documents.filter((d) => !d.triage).length;
+  const aVerifier = documents.filter((d) => d.triage?.aVerifier).length;
   const visibles = documents.filter(
     (d) => (!filtre || d.triage?.categorie === filtre) && (!seulementAVerifier || d.triage?.aVerifier)
   );
@@ -108,20 +110,43 @@ export function EcranDocuments() {
     return (
       <section className="ecran">
         <h1>Documents</h1>
-        <div className="vide">
-          <p>Choisissez un dossier : l’agent en extrait le texte (TXT, Markdown, PDF, Word) sur ce PC, sans rien envoyer.</p>
-          <div className="actions">
-            <button type="button" className="principal" disabled={operation !== null} onClick={() => void choisirDossier()}>
-              Choisir un dossier…
-            </button>
-            {etat?.dernierDossier && (
-              <button type="button" disabled={operation !== null} onClick={() => void indexer(etat.dernierDossier as string)}>
-                Rouvrir {etat.dernierDossier}
+        <div className="accueil">
+          <h2>Bienvenue ! Trois étapes pour commencer</h2>
+          <ol className="etapes">
+            <li>
+              <h3>Vérifiez que l’agent est prêt</h3>
+              <EtatPreparation />
+            </li>
+            <li>
+              <h3>Choisissez un dossier de documents</h3>
+              <p>
+                Factures, devis, contrats, courriers… en PDF, Word, TXT ou Markdown, sous-dossiers compris. L’agent lit les fichiers
+                sur ce PC : rien n’est envoyé à cette étape.
+              </p>
+              <div className="actions">
+                <button type="button" className="principal" disabled={operation !== null} onClick={() => void choisirDossier()}>
+                  Choisir un dossier…
+                </button>
+                {etat?.dernierDossier && (
+                  <button type="button" disabled={operation !== null} onClick={() => void lireDossier(etat.dernierDossier as string)}>
+                    Rouvrir {etat.dernierDossier}
+                  </button>
+                )}
+              </div>
+              {operation === 'lecture' && <AvancementLecture progression={progression} annuler={annulerLecture} />}
+              {erreur && <MessageErreur message={erreur} />}
+            </li>
+            <li>
+              <h3>Classez, cherchez, résumez</h3>
+              <p>
+                L’agent donne à chaque document une catégorie, dit s’il demande une action et s’il est urgent. Posez ensuite vos
+                questions dans l’écran Recherche, ou résumez un document en un clic.
+              </p>
+              <button type="button" className="lien" onClick={() => allerA('aide')}>
+                Lire l’aide pour débuter
               </button>
-            )}
-          </div>
-          {operation === 'indexation' && <AvancementIndexation progression={progression} annuler={annulerIndexation} />}
-          {erreur && <Message type="erreur">{erreur}</Message>}
+            </li>
+          </ol>
         </div>
       </section>
     );
@@ -140,15 +165,20 @@ export function EcranDocuments() {
         <button type="button" disabled={operation !== null} onClick={() => void choisirDossier()}>
           Changer de dossier…
         </button>
-        <button type="button" disabled={operation !== null} onClick={() => void indexer(corpus.dossier)}>
-          Réindexer
+        <button
+          type="button"
+          disabled={operation !== null}
+          onClick={() => void lireDossier(corpus.dossier)}
+          title="Relire le dossier : fichiers ajoutés ou modifiés, options activées"
+        >
+          Actualiser
         </button>
-        <button type="button" className="principal" disabled={operation !== null || restants === 0} onClick={() => void trier()}>
+        <button type="button" className="principal" disabled={operation !== null || restants === 0} onClick={() => void classer()}>
           {restants === 0
-            ? 'Tous les documents sont triés'
+            ? 'Tous les documents sont classés'
             : restants === documents.length
-              ? `Trier les ${restants} documents`
-              : `Trier les ${restants} restants`}
+              ? `Classer les ${restants} documents`
+              : `Classer les ${restants} restants`}
         </button>
         <span className="separateur" />
         <label>
@@ -162,17 +192,29 @@ export function EcranDocuments() {
             ))}
           </select>
         </label>
-        <label className="case">
+        <label className="case" title="Documents dont la catégorie est incertaine">
           <input type="checkbox" checked={seulementAVerifier} onChange={(e) => definirSeulementAVerifier(e.target.checked)} />À
           vérifier seulement
         </label>
       </div>
 
-      {operation === 'indexation' && <AvancementIndexation progression={progression} annuler={annulerIndexation} />}
-      {operation === 'triage' && progression?.type === 'triage' && (
-        <BarreProgression fait={progression.fait} total={progression.total} libelle="Triage des documents" />
+      {operation === null && documents.length > 0 && restants === documents.length && (
+        <p className="indice etape-suivante">
+          Étape suivante : cliquez sur « Classer les {restants} documents ». L’agent indique pour chacun sa catégorie, s’il demande
+          une action (payer, répondre, signer…) et son urgence.
+        </p>
       )}
-      {erreur && <Message type="erreur">{erreur}</Message>}
+      {operation === null && restants === 0 && aVerifier > 0 && (
+        <p className="indice etape-suivante">
+          {aVerifier} document(s) « à vérifier » : l’agent hésite sur leur catégorie. Cochez « À vérifier seulement » pour les
+          revoir.
+        </p>
+      )}
+      {operation === 'lecture' && <AvancementLecture progression={progression} annuler={annulerLecture} />}
+      {operation === 'classement' && progression?.type === 'triage' && (
+        <BarreProgression fait={progression.fait} total={progression.total} libelle="Classement des documents" />
+      )}
+      {erreur && <MessageErreur message={erreur} />}
       {corpus.avis.map((avis) => (
         <Message key={avis} type="alerte">
           {avis}
@@ -180,7 +222,7 @@ export function EcranDocuments() {
       ))}
       {corpus.semantique && (
         <p className="indice">
-          Recherche sémantique prête : {formaterEntier(corpus.semantique.passages)} passages, modèle {corpus.semantique.modele}.
+          Recherche par le sens prête : {formaterEntier(corpus.semantique.passages)} passages, modèle {corpus.semantique.modele}.
         </p>
       )}
       {corpus.erreurs.length > 0 && (
@@ -203,8 +245,8 @@ export function EcranDocuments() {
               <tr>
                 <th>Document</th>
                 <th>Catégorie</th>
-                <th>Confiance</th>
-                <th>Action</th>
+                <th title="Certitude de l’agent sur la catégorie">Confiance</th>
+                <th title="Le document demande-t-il une action : payer, répondre, signer ?">Action à faire</th>
                 <th>Urgence</th>
               </tr>
             </thead>
@@ -221,7 +263,7 @@ export function EcranDocuments() {
                   <td>
                     <span className="nom-document">{d.nom}</span>
                     {d.pagesOcr ? (
-                      <span title={`${d.pagesOcr} page(s) lue(s) par OCR`}>
+                      <span title={`${d.pagesOcr} page(s) scannée(s) lue(s) par OCR`}>
                         {' '}
                         <Pastille ton="neutre">OCR</Pastille>
                       </span>
@@ -237,7 +279,10 @@ export function EcranDocuments() {
                       '–'
                     )}
                   </td>
-                  <td className={d.triage?.aVerifier ? 'a-verifier' : undefined} title={d.triage?.aVerifier ? 'À vérifier : confiance sous le seuil' : undefined}>
+                  <td
+                    className={d.triage?.aVerifier ? 'a-verifier' : undefined}
+                    title={d.triage?.aVerifier ? 'À vérifier : l’agent hésite sur la catégorie' : undefined}
+                  >
                     {d.triage ? `${formaterPourcentage(d.triage.confiance)}${d.triage.aVerifier ? ' ⚠' : ''}` : '–'}
                   </td>
                   <td>{d.triage ? (d.triage.actionRequise ? 'Oui' : 'Non') : '–'}</td>
@@ -251,7 +296,7 @@ export function EcranDocuments() {
 
         <aside className="fiche" aria-label="Fiche du document">
           {!detail ? (
-            <p className="indice">Sélectionnez un document pour voir son triage, son résumé et son texte.</p>
+            <p className="indice">Cliquez sur un document pour voir son classement, le résumer ou lire son texte.</p>
           ) : (
             <>
               <h2>{detail.nom}</h2>
@@ -264,8 +309,8 @@ export function EcranDocuments() {
                 <button type="button" onClick={() => void api.documents.ouvrir(detail.id).catch((e: unknown) => definirErreur(messageErreur(e)))}>
                   Ouvrir le fichier
                 </button>
-                <button type="button" disabled={operation !== null} onClick={() => void trier([detail.id])}>
-                  {detail.triage ? 'Retrier' : 'Trier'}
+                <button type="button" disabled={operation !== null} onClick={() => void classer([detail.id])}>
+                  {detail.triage ? 'Reclasser' : 'Classer'}
                 </button>
                 <button type="button" className="principal" disabled={operation !== null} onClick={() => void resumer(detail.id)}>
                   {operation === 'resume' ? 'Résumé en cours…' : detail.resume ? 'Refaire le résumé' : 'Résumer'}
@@ -274,14 +319,15 @@ export function EcranDocuments() {
 
               {detail.triage && (
                 <section className="bloc">
-                  <h3>Triage</h3>
+                  <h3>Classement</h3>
+                  <p className="indice">Ce que l’agent pense de ce document, et avec quelle certitude.</p>
                   {Object.entries(detail.triage.probabilites)
                     .sort((a, b) => b[1] - a[1])
                     .slice(0, 3)
                     .map(([id, p]) => (
                       <Jauge key={id} valeur={p} libelle={categories.get(id) ?? id} />
                     ))}
-                  <Jauge valeur={detail.triage.probabiliteAction} libelle="Action requise" />
+                  <Jauge valeur={detail.triage.probabiliteAction} libelle="Action à faire" />
                   <p>
                     Urgence : <Urgence note={detail.triage.urgence} />{' '}
                     {detail.triage.aVerifier && <Pastille ton="alerte">À vérifier</Pastille>}
@@ -299,7 +345,7 @@ export function EcranDocuments() {
               )}
 
               <details className="bloc">
-                <summary>Aperçu du texte extrait</summary>
+                <summary>Texte lu par l’agent</summary>
                 <pre className="apercu">{detail.apercu}</pre>
               </details>
             </>

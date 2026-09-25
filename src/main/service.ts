@@ -99,13 +99,13 @@ export class ServiceAgent {
   }
 
   #corpusOuvert(): Corpus {
-    if (!this.#corpus) throw new Error("Aucun dossier indexé : choisissez d’abord un dossier.");
+    if (!this.#corpus) throw new Error('Aucun dossier ouvert : choisissez d’abord un dossier dans l’écran Documents.');
     return this.#corpus;
   }
 
   #document(id: string): DocumentIndexe {
     const document = this.#corpusOuvert().documents.find((d) => d.id === id);
-    if (!document) throw new Error(`Document inconnu : « ${id} ». Réindexez le dossier.`);
+    if (!document) throw new Error(`Document introuvable : « ${id} ». Actualisez le dossier.`);
     return document;
   }
 
@@ -127,7 +127,7 @@ export class ServiceAgent {
   }
 
   async indexer(dossier: string): Promise<EtatCorpus> {
-    if (this.#indexation) throw new Error('Une indexation est déjà en cours.');
+    if (this.#indexation) throw new Error('Le dossier est déjà en cours de lecture.');
     const annulation = new AbortController();
     this.#indexation = annulation;
     try {
@@ -144,7 +144,7 @@ export class ServiceAgent {
       this.#consigner(corpus.mesures);
       return this.etatCorpus() as EtatCorpus;
     } catch (erreur) {
-      if (annulation.signal.aborted) throw new Error('Indexation annulée.');
+      if (annulation.signal.aborted) throw new Error('Lecture du dossier annulée.');
       throw erreur;
     } finally {
       this.#indexation = null;

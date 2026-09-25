@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { sansAccents } from '../../../coeur/texte/normalisation';
-import { type EntreeJournal, type EtatService, LIBELLES_OPERATION, type NomCle } from '../../../partage/contrat';
+import { type EntreeJournal, LIBELLES_OPERATION, type NomCle } from '../../../partage/contrat';
 import { formaterEntier, formaterUsd } from '../../../partage/format';
 import type { Reglages } from '../../../partage/reglages';
 import type { Categorie } from '../../../partage/types';
 import { api, messageErreur } from '../api';
 import { Message, Pastille } from '../composants';
 import { useApplication } from '../contexte';
+import { EtatPreparation } from '../preparation';
 
 const identifiant = (libelle: string): string =>
   sansAccents(libelle.toLowerCase())
@@ -52,7 +53,7 @@ function Cle({ nom, libelle }: { nom: NomCle; libelle: string }) {
           disabled={!etat.chiffrementDisponible}
         />
         <button type="button" disabled={!valeur.trim()} onClick={() => void definir(valeur)}>
-          Enregistrer
+          Enregistrer la clé
         </button>
         {enregistree && (
           <button type="button" onClick={() => void definir('')}>
@@ -69,7 +70,22 @@ function Cle({ nom, libelle }: { nom: NomCle; libelle: string }) {
 function ModeleAbsent({ modele, actif, modeles }: { modele: string; actif: boolean; modeles: string[] }) {
   const nom = modele.trim();
   if (!actif || !nom || modeles.length === 0 || modeles.includes(nom) || modeles.includes(`${nom}:latest`)) return null;
-  return <Message type="alerte">Modèle absent d’Ollama : lancez « ollama pull {nom} ».</Message>;
+  return (
+    <Message type="alerte">
+      Modèle absent d’Ollama : tapez « ollama pull {nom} » dans un terminal (voir l’Aide, « Installer Ollama »).
+    </Message>
+  );
+}
+
+/** Clé de mémorisation de l'affichage des réglages avancés. */
+const CLE_AVANCES = 'brd:reglages-avances';
+
+function lireAvances(): boolean {
+  try {
+    return localStorage.getItem(CLE_AVANCES) === '1';
+  } catch {
+    return false;
+  }
 }
 
 function EditeurCategories({ categories, changer }: { categories: Categorie[]; changer: (c: Categorie[]) => void }) {
@@ -113,12 +129,12 @@ function EditeurCategories({ categories, changer }: { categories: Categorie[]; c
 }
 
 export function EcranReglages() {
-  const { etat, enregistrerReglages } = useApplication();
+  const { etat, enregistrerReglages, allerA } = useApplication();
   const [brouillon, definirBrouillon] = useState<Reglages | null>(null);
   const [modeles, definirModeles] = useState<string[]>([]);
-  const [diagnostic, definirDiagnostic] = useState<EtatService[] | null>(null);
   const [journal, definirJournal] = useState<EntreeJournal[]>([]);
   const [message, definirMessage] = useState<{ type: 'succes' | 'erreur'; texte: string } | null>(null);
+  const [avances, definirAvances] = useState(lireAvances);
 
   // Mode (en-tête) et thème (barre latérale) se règlent ailleurs : les suivre sans
   // effacer les modifications en cours.
@@ -130,8 +146,11 @@ export function EcranReglages() {
   }, [etat]);
 
   useEffect(() => {
-    api.services.modelesOllama().then(definirModeles, () => definirModeles([]));
     void api.journal().then(definirJournal);
+  }, []);
+
+  const lireModeles = useCallback(() => {
+    api.services.modelesOllama().then(definirModeles, () => definirModeles([]));
   }, []);
 
   if (!etat || !brouillon) return null;
@@ -140,6 +159,15 @@ export function EcranReglages() {
   const section = <S extends keyof Reglages>(nom: S, partiel: Partial<Reglages[S]>) =>
     definirBrouillon({ ...brouillon, [nom]: { ...(brouillon[nom] as object), ...partiel } });
   const nombre = (valeur: string): number => Number(valeur.replace(',', '.'));
+
+  const basculerAvances = (valeur: boolean) => {
+    definirAvances(valeur);
+    try {
+      localStorage.setItem(CLE_AVANCES, valeur ? '1' : '0');
+    } catch {
+      // Stockage indisponible : le choix vaut pour cette session seulement.
+    }
+  };
 
   const enregistrer = async () => {
     definirMessage(null);
@@ -153,22 +181,12 @@ export function EcranReglages() {
     }
   };
 
-  const verifier = async () => {
-    definirDiagnostic(null);
-    try {
-      definirDiagnostic(await api.services.diagnostic());
-      definirModeles(await api.services.modelesOllama().catch(() => []));
-    } catch (e) {
-      definirMessage({ type: 'erreur', texte: messageErreur(e) });
-    }
-  };
-
   return (
     <section className="ecran ecran-reglages">
-      <div className="titre-ecran">
+      <div className={`titre-ecran barre-enregistrement${modifie ? ' modifiee' : ''}`}>
         <h1>Réglages</h1>
         <div className="actions">
-          {modifie && <span className="indice">Modifications non enregistrées</span>}
+          {modifie && <span className="a-enregistrer">Modifications à enregistrer</span>}
           <button type="button" onClick={() => definirBrouillon(etat.reglages)} disabled={!modifie}>
             Annuler les modifications
           </button>
@@ -180,52 +198,18 @@ export function EcranReglages() {
       {message && <Message type={message.type}>{message.texte}</Message>}
 
       <section className="carte">
-        <h2>Services</h2>
-        <button type="button" onClick={() => void verifier()}>
-          Vérifier Ollama, OpenRouter et Jev
-        </button>
-        {diagnostic && (
-          <ul className="diagnostic">
-            {diagnostic.map((d) => (
-              <li key={d.service}>
-                <Pastille ton={d.ok ? 'succes' : 'danger'}>{d.ok ? 'prêt' : 'à corriger'}</Pastille> <strong>{d.service}</strong> :{' '}
-                {d.detail}
-              </li>
-            ))}
-          </ul>
-        )}
+        <h2>L’agent est-il prêt ?</h2>
+        <EtatPreparation apresVerification={lireModeles} />
       </section>
 
       <section className="carte">
-        <h2>Mode local : Ollama</h2>
-        <datalist id="modeles-ollama">
-          {modeles.map((m) => (
-            <option key={m} value={m} />
-          ))}
-        </datalist>
-        <label className="champ">
-          <span>Adresse du serveur</span>
-          <input value={brouillon.ollama.url} onChange={(e) => section('ollama', { url: e.target.value })} />
-        </label>
-        <label className="champ">
-          <span>Modèle de décision (tri, pertinence)</span>
-          <input list="modeles-ollama" value={brouillon.ollama.modeleDecision} onChange={(e) => section('ollama', { modeleDecision: e.target.value })} />
-        </label>
-        <label className="champ">
-          <span>Modèle de rédaction (résumés)</span>
-          <input list="modeles-ollama" value={brouillon.ollama.modeleResume} onChange={(e) => section('ollama', { modeleResume: e.target.value })} />
-        </label>
-        <label className="champ">
-          <span>Contexte (jetons)</span>
-          <input type="number" min={2048} step={1024} value={brouillon.ollama.contexte} onChange={(e) => section('ollama', { contexte: nombre(e.target.value) })} />
-        </label>
+        <h2>Mode hybride : clé OpenRouter</h2>
         <p className="indice">
-          Ollama 0.12.11 ou plus récent fournit les probabilités des décisions. {modeles.length ? `Modèles installés : ${modeles.join(', ')}.` : 'Aucun modèle détecté pour l’instant.'}
+          Seulement pour le mode Hybride : la même clé donne accès à Jev et aux résumés en ligne.{' '}
+          <button type="button" className="lien" onClick={() => allerA('aide', 'openrouter')}>
+            Comment obtenir une clé ?
+          </button>
         </p>
-      </section>
-
-      <section className="carte">
-        <h2>Mode hybride : Jev et OpenRouter</h2>
         {!etat.chiffrementDisponible && (
           <Message type="alerte">
             Le chiffrement du système est indisponible : les clés ne peuvent pas être enregistrées ici. Utilisez les variables
@@ -233,34 +217,6 @@ export function EcranReglages() {
           </Message>
         )}
         <Cle nom="cleOpenRouter" libelle="Clé OpenRouter" />
-        <label className="champ">
-          <span>Modèle de rédaction OpenRouter (résumés)</span>
-          <input value={brouillon.openrouter.modeleResume} onChange={(e) => section('openrouter', { modeleResume: e.target.value })} />
-        </label>
-        <label className="case">
-          <input type="checkbox" checked={brouillon.openrouter.refuserCollecte} onChange={(e) => section('openrouter', { refuserCollecte: e.target.checked })} />
-          Exclure les fournisseurs qui conservent ou réutilisent les données
-        </label>
-        <label className="case">
-          <input type="checkbox" checked={brouillon.openrouter.exigerZdr} onChange={(e) => section('openrouter', { exigerZdr: e.target.checked })} />
-          N’accepter que les fournisseurs à rétention nulle (ZDR)
-        </label>
-        <fieldset className="champ">
-          <legend>Accès à Jev</legend>
-          <label className="case">
-            <input type="radio" name="acces-jev" checked={brouillon.jev.acces === 'openrouter'} onChange={() => section('jev', { acces: 'openrouter' })} />
-            Par OpenRouter, avec la même clé
-          </label>
-          <label className="case">
-            <input type="radio" name="acces-jev" checked={brouillon.jev.acces === 'typesafe'} onChange={() => section('jev', { acces: 'typesafe' })} />
-            En direct chez TypeSafe
-          </label>
-        </fieldset>
-        <label className="champ">
-          <span>Modèle Jev</span>
-          <input value={brouillon.jev.modele} onChange={(e) => section('jev', { modele: e.target.value })} />
-        </label>
-        {brouillon.jev.acces === 'typesafe' && <Cle nom="cleTypeSafe" libelle="Clé TypeSafe" />}
       </section>
 
       <section className="carte">
@@ -269,8 +225,8 @@ export function EcranReglages() {
           <input type="checkbox" checked={brouillon.confidentialite.masquage} onChange={(e) => section('confidentialite', { masquage: e.target.checked })} />
           Masquer courriels, téléphones, IBAN, cartes bancaires et numéros de sécurité sociale avant tout envoi
         </label>
-        <p className="indice">Les noms de personnes et les adresses postales ne sont pas masqués.</p>
-        <h3>Journal des envois hors de la machine</h3>
+        <p className="indice">Recommandé. Les noms de personnes et les adresses postales ne sont pas masqués.</p>
+        <h3>Journal des envois sur Internet</h3>
         {journal.length === 0 ? (
           <p className="indice">Aucun envoi depuis le lancement de l’application.</p>
         ) : (
@@ -305,85 +261,161 @@ export function EcranReglages() {
         )}
       </section>
 
-      <section className="carte">
-        <h2>Tri des documents</h2>
-        <label className="champ">
-          <span>Seuil de confiance : {Math.round(brouillon.classement.seuilConfiance * 100)} %</span>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={brouillon.classement.seuilConfiance}
-            onChange={(e) => section('classement', { seuilConfiance: nombre(e.target.value) })}
-          />
-        </label>
-        <p className="indice">Sous ce seuil, le document est marqué « à vérifier ».</p>
-        <label className="champ">
-          <span>Caractères du document soumis à la décision</span>
-          <input type="number" min={500} step={500} value={brouillon.classement.caracteresMax} onChange={(e) => section('classement', { caracteresMax: nombre(e.target.value) })} />
-        </label>
-        <h3>Catégories</h3>
-        <EditeurCategories categories={brouillon.classement.categories} changer={(categories) => section('classement', { categories })} />
-      </section>
-
-      <section className="carte">
-        <h2>Recherche et résumés</h2>
-        <label className="champ">
-          <span>Passages soumis à la décision de pertinence</span>
-          <input type="number" min={1} max={50} value={brouillon.recherche.candidats} onChange={(e) => section('recherche', { candidats: nombre(e.target.value) })} />
-        </label>
-        <label className="champ">
-          <span>Résultats affichés</span>
-          <input type="number" min={1} max={50} value={brouillon.recherche.resultats} onChange={(e) => section('recherche', { resultats: nombre(e.target.value) })} />
-        </label>
-        <label className="champ">
-          <span>Taille d’une partie résumée séparément (caractères)</span>
-          <input type="number" min={1000} step={1000} value={brouillon.resume.caracteresParPartie} onChange={(e) => section('resume', { caracteresParPartie: nombre(e.target.value) })} />
-        </label>
-        <label className="champ">
-          <span>Longueur maximale d’un résumé (jetons)</span>
-          <input type="number" min={100} step={100} value={brouillon.resume.maxJetons} onChange={(e) => section('resume', { maxJetons: nombre(e.target.value) })} />
-        </label>
-      </section>
-
       <section className="carte" aria-labelledby="titre-options">
         <h2 id="titre-options">Options locales facultatives</h2>
         <p className="indice">
-          Désactivées par défaut : l’agent fonctionne sans elles. Elles utilisent des modèles d’Ollama sur ce PC, dans tous les
-          modes, et s’appliquent à la prochaine indexation d’un dossier.
+          Désactivées par défaut : l’agent fonctionne sans elles. Elles utilisent Ollama sur ce PC, dans tous les modes. Après les
+          avoir cochées, cliquez sur « Enregistrer », puis sur « Actualiser » dans l’écran Documents.{' '}
+          <button type="button" className="lien" onClick={() => allerA('aide', 'options')}>
+            En savoir plus
+          </button>
         </p>
         <label className="case">
           <input type="checkbox" checked={brouillon.semantique.active} onChange={(e) => section('semantique', { active: e.target.checked })} />
-          Recherche sémantique : trouver des passages par le sens, pas seulement par les mots
+          Recherche par le sens (sémantique) : trouver aussi les passages qui disent la même chose avec d’autres mots
         </label>
-        <label className="champ">
-          <span>Modèle de plongement</span>
-          <input list="modeles-ollama" value={brouillon.semantique.modele} onChange={(e) => section('semantique', { modele: e.target.value })} />
-        </label>
+        {avances && (
+          <label className="champ">
+            <span>Modèle de plongement</span>
+            <input list="modeles-ollama" value={brouillon.semantique.modele} onChange={(e) => section('semantique', { modele: e.target.value })} />
+          </label>
+        )}
         <ModeleAbsent modele={brouillon.semantique.modele} actif={brouillon.semantique.active} modeles={modeles} />
-        <p className="indice">
-          Par exemple embeddinggemma ou nomic-embed-text-v2-moe. Les vecteurs des passages sont calculés à l’indexation ; la
-          recherche fusionne ensuite les classements par mots-clés et par le sens.
-        </p>
         <label className="case">
           <input type="checkbox" checked={brouillon.ocr.active} onChange={(e) => section('ocr', { active: e.target.checked })} />
-          Lecture des PDF scannés : un modèle de vision lit les pages sans texte
+          Lecture des PDF scannés : lire les pages qui ne sont que des images (plusieurs secondes par page)
         </label>
-        <label className="champ">
-          <span>Modèle de vision</span>
-          <input list="modeles-ollama" value={brouillon.ocr.modele} onChange={(e) => section('ocr', { modele: e.target.value })} />
-        </label>
-        <label className="champ">
-          <span>Pages lues au plus par document</span>
-          <input type="number" min={1} max={200} value={brouillon.ocr.pagesMax} onChange={(e) => section('ocr', { pagesMax: nombre(e.target.value) })} />
-        </label>
+        {avances && (
+          <>
+            <label className="champ">
+              <span>Modèle de vision</span>
+              <input list="modeles-ollama" value={brouillon.ocr.modele} onChange={(e) => section('ocr', { modele: e.target.value })} />
+            </label>
+            <label className="champ">
+              <span>Pages lues au plus par document</span>
+              <input type="number" min={1} max={200} value={brouillon.ocr.pagesMax} onChange={(e) => section('ocr', { pagesMax: nombre(e.target.value) })} />
+            </label>
+            <p className="indice">
+              Le texte lu est gardé dans le dossier de données de l’application, pour ne pas relire les mêmes pages.
+            </p>
+          </>
+        )}
         <ModeleAbsent modele={brouillon.ocr.modele} actif={brouillon.ocr.active} modeles={modeles} />
-        <p className="indice">
-          Par exemple minicpm-v4.6:1b. Comptez plusieurs secondes par page. Le texte lu est gardé dans le dossier de données de
-          l’application, pour ne pas relire les mêmes pages.
-        </p>
       </section>
+
+      <label className="case bascule-avances">
+        <input type="checkbox" checked={avances} onChange={(e) => basculerAvances(e.target.checked)} />
+        Afficher les réglages avancés
+      </label>
+      <p className="indice">Modèles, seuils, catégories… Les valeurs par défaut conviennent pour commencer.</p>
+
+      <datalist id="modeles-ollama">
+        {modeles.map((m) => (
+          <option key={m} value={m} />
+        ))}
+      </datalist>
+
+      {avances && (
+        <>
+          <section className="carte">
+            <h2>Mode local : Ollama</h2>
+            <label className="champ">
+              <span>Adresse du serveur</span>
+              <input value={brouillon.ollama.url} onChange={(e) => section('ollama', { url: e.target.value })} />
+            </label>
+            <label className="champ">
+              <span>Modèle de décision (classement, pertinence)</span>
+              <input list="modeles-ollama" value={brouillon.ollama.modeleDecision} onChange={(e) => section('ollama', { modeleDecision: e.target.value })} />
+            </label>
+            <label className="champ">
+              <span>Modèle de rédaction (résumés)</span>
+              <input list="modeles-ollama" value={brouillon.ollama.modeleResume} onChange={(e) => section('ollama', { modeleResume: e.target.value })} />
+            </label>
+            <label className="champ">
+              <span>Contexte (jetons)</span>
+              <input type="number" min={2048} step={1024} value={brouillon.ollama.contexte} onChange={(e) => section('ollama', { contexte: nombre(e.target.value) })} />
+            </label>
+            <p className="indice">
+              Ollama 0.12.11 ou plus récent fournit les probabilités des décisions.{' '}
+              {modeles.length ? `Modèles installés : ${modeles.join(', ')}.` : 'Aucun modèle détecté pour l’instant.'}
+            </p>
+          </section>
+
+          <section className="carte">
+            <h2>Mode hybride : Jev et OpenRouter</h2>
+            <label className="champ">
+              <span>Modèle de rédaction OpenRouter (résumés)</span>
+              <input value={brouillon.openrouter.modeleResume} onChange={(e) => section('openrouter', { modeleResume: e.target.value })} />
+            </label>
+            <label className="case">
+              <input type="checkbox" checked={brouillon.openrouter.refuserCollecte} onChange={(e) => section('openrouter', { refuserCollecte: e.target.checked })} />
+              Exclure les fournisseurs qui conservent ou réutilisent les données
+            </label>
+            <label className="case">
+              <input type="checkbox" checked={brouillon.openrouter.exigerZdr} onChange={(e) => section('openrouter', { exigerZdr: e.target.checked })} />
+              N’accepter que les fournisseurs à rétention nulle (ZDR)
+            </label>
+            <fieldset className="champ">
+              <legend>Accès à Jev</legend>
+              <label className="case">
+                <input type="radio" name="acces-jev" checked={brouillon.jev.acces === 'openrouter'} onChange={() => section('jev', { acces: 'openrouter' })} />
+                Par OpenRouter, avec la même clé
+              </label>
+              <label className="case">
+                <input type="radio" name="acces-jev" checked={brouillon.jev.acces === 'typesafe'} onChange={() => section('jev', { acces: 'typesafe' })} />
+                En direct chez TypeSafe
+              </label>
+            </fieldset>
+            <label className="champ">
+              <span>Modèle Jev</span>
+              <input value={brouillon.jev.modele} onChange={(e) => section('jev', { modele: e.target.value })} />
+            </label>
+            {brouillon.jev.acces === 'typesafe' && <Cle nom="cleTypeSafe" libelle="Clé TypeSafe" />}
+          </section>
+
+          <section className="carte">
+            <h2>Classement des documents</h2>
+            <label className="champ">
+              <span>Seuil de confiance : {Math.round(brouillon.classement.seuilConfiance * 100)} %</span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={brouillon.classement.seuilConfiance}
+                onChange={(e) => section('classement', { seuilConfiance: nombre(e.target.value) })}
+              />
+            </label>
+            <p className="indice">Sous ce seuil, le document est marqué « à vérifier ».</p>
+            <label className="champ">
+              <span>Caractères du document soumis à la décision</span>
+              <input type="number" min={500} step={500} value={brouillon.classement.caracteresMax} onChange={(e) => section('classement', { caracteresMax: nombre(e.target.value) })} />
+            </label>
+            <h3>Catégories</h3>
+            <EditeurCategories categories={brouillon.classement.categories} changer={(categories) => section('classement', { categories })} />
+          </section>
+
+          <section className="carte">
+            <h2>Recherche et résumés</h2>
+            <label className="champ">
+              <span>Passages soumis à la décision de pertinence</span>
+              <input type="number" min={1} max={50} value={brouillon.recherche.candidats} onChange={(e) => section('recherche', { candidats: nombre(e.target.value) })} />
+            </label>
+            <label className="champ">
+              <span>Résultats affichés</span>
+              <input type="number" min={1} max={50} value={brouillon.recherche.resultats} onChange={(e) => section('recherche', { resultats: nombre(e.target.value) })} />
+            </label>
+            <label className="champ">
+              <span>Taille d’une partie résumée séparément (caractères)</span>
+              <input type="number" min={1000} step={1000} value={brouillon.resume.caracteresParPartie} onChange={(e) => section('resume', { caracteresParPartie: nombre(e.target.value) })} />
+            </label>
+            <label className="champ">
+              <span>Longueur maximale d’un résumé (jetons)</span>
+              <input type="number" min={100} step={100} value={brouillon.resume.maxJetons} onChange={(e) => section('resume', { maxJetons: nombre(e.target.value) })} />
+            </label>
+          </section>
+        </>
+      )}
     </section>
   );
 }

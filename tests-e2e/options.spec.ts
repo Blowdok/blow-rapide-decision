@@ -1,6 +1,6 @@
 // Parcours des options facultatives, face à un serveur qui imite Ollama :
-// lecture OCR d'un PDF scanné, recherche sémantique, puis annulation d'une
-// indexation trop longue. Aucun vrai modèle n'est nécessaire.
+// lecture OCR d'un PDF scanné, recherche par le sens, puis annulation d'une
+// lecture de dossier trop longue. Aucun vrai modèle n'est nécessaire.
 
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
@@ -97,7 +97,7 @@ test('lit le PDF scanné par OCR et prépare la recherche sémantique', async ()
   // Le sélecteur de dossier est une boîte de dialogue native : on passe par l'API exposée.
   await fenetre.evaluate((dossier) => (globalThis as unknown as { brd: ApiBureau }).brd.dossier.indexer(dossier), documents);
   await fenetre.reload();
-  await expect(fenetre.getByText('Recherche sémantique prête : 3 passages, modèle embeddinggemma.')).toBeVisible();
+  await expect(fenetre.getByText('Recherche par le sens prête : 3 passages, modèle embeddinggemma.')).toBeVisible();
   const ligne = fenetre.getByRole('row', { name: /avis-scanne\.pdf/ });
   await expect(ligne).toContainText('OCR');
   await ligne.click();
@@ -109,19 +109,19 @@ test('lit le PDF scanné par OCR et prépare la recherche sémantique', async ()
 
 test('trouve un document par le sens, sans mot commun', async () => {
   await fenetre.getByRole('button', { name: /^Recherche/ }).click();
-  await expect(fenetre.getByText(/par les mots-clés et par le sens/)).toBeVisible();
+  await expect(fenetre.getByText('La recherche comprend aussi les mots de sens proche (option activée).')).toBeVisible();
   await fenetre.getByRole('searchbox', { name: 'Requête' }).fill('rémunération');
   await fenetre.getByRole('button', { name: 'Chercher' }).click();
   const premier = fenetre.locator('.resultat').first();
   await expect(premier).toContainText('bulletin-septembre.txt');
-  await expect(premier).toContainText('rang lexical – · rang sémantique 1');
+  await expect(premier).toContainText('Trouvé par le sens');
   await capturer('options-02-recherche');
 });
 
 test('affiche les options actives dans les réglages', async () => {
   await fenetre.getByRole('button', { name: /^Réglages/ }).click();
   const options = fenetre.getByRole('region', { name: 'Options locales facultatives' });
-  await expect(options.getByRole('checkbox', { name: /Recherche sémantique/ })).toBeChecked();
+  await expect(options.getByRole('checkbox', { name: /Recherche par le sens/ })).toBeChecked();
   await expect(options.getByRole('checkbox', { name: /Lecture des PDF scannés/ })).toBeChecked();
   // Modèles présents dans le faux Ollama : aucune alerte.
   await expect(options.getByText(/Modèle absent/)).toHaveCount(0);
@@ -133,11 +133,11 @@ test('annule une lecture OCR trop longue et garde le dossier ouvert', async () =
   lenteurOcrMs = 60_000;
   await writeFile(join(documents, 'releve-scanne.pdf'), creerPdfPages([{ image: imageScannee(500, 700) }]));
   await fenetre.getByRole('button', { name: /^Documents/ }).click();
-  await fenetre.getByRole('button', { name: 'Réindexer' }).click();
+  await fenetre.getByRole('button', { name: 'Actualiser' }).click();
   await expect(fenetre.getByText('Lecture OCR de releve-scanne.pdf : page 1 sur 1')).toBeVisible();
   await capturer('options-04-lecture-ocr');
   await fenetre.getByRole('button', { name: 'Annuler', exact: true }).click();
-  await expect(fenetre.getByText('Indexation annulée.')).toBeVisible();
+  await expect(fenetre.getByText('Lecture du dossier annulée.')).toBeVisible();
   await expect(fenetre.getByRole('row', { name: /bulletin-septembre\.txt/ })).toBeVisible();
   await expect(fenetre.getByRole('row', { name: /releve-scanne\.pdf/ })).toHaveCount(0);
 });

@@ -104,16 +104,16 @@ export const REGLAGES_PAR_DEFAUT: Reglages = {
 export const PROFILS: Record<IdProfil, { libelle: string; description: string }> = {
   local: {
     libelle: 'Local',
-    description: 'Tout reste sur ce PC : Ollama décide et résume.'
+    description: 'Tout reste sur ce PC : une IA installée sur l’ordinateur (Ollama) classe, cherche et résume. Gratuit.'
   },
   hybride: {
     libelle: 'Hybride',
     description:
-      'Jev décide et un modèle OpenRouter résume ; des extraits partent sur Internet, données personnelles masquées.'
+      'Jev et une IA en ligne (OpenRouter) travaillent sur des extraits, données personnelles masquées. Payant à l’usage.'
   },
   reference: {
     libelle: 'Référence sans IA',
-    description: 'Heuristiques lexicales : point de comparaison, hors ligne et instantané.'
+    description: 'De simples règles sur les mots : instantané et hors ligne, sert de point de comparaison.'
   }
 };
 
