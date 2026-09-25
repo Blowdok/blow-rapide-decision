@@ -1,0 +1,42 @@
+{
+  "nom": "Démo bureau : petite agence web",
+  "description": "Douze documents fictifs d'une agence web de La Rochelle : factures, devis, contrat, courriers administratifs, banque, assurance, paie, candidature, compte rendu et notes.",
+  "documents": "documents",
+  "classement": [
+    { "document": "facture-imprimerie-lumen.txt", "categorie": "facture", "action": true, "urgence": 1 },
+    { "document": "relance-facture-hebergeur.md", "categorie": "facture", "action": true, "urgence": 2 },
+    { "document": "devis-application-mobile.md", "categorie": "devis", "action": true, "urgence": 1 },
+    { "document": "contrat-maintenance-site.txt", "categorie": "contrat", "action": false, "urgence": 0 },
+    { "document": "avis-taxe-fonciere-2026.txt", "categorie": "administratif", "action": true, "urgence": 1 },
+    { "document": "urssaf-mise-en-demeure.txt", "categorie": "administratif", "action": true, "urgence": 2 },
+    { "document": "releve-banque-aout-2026.txt", "categorie": "banque-assurance", "action": false, "urgence": 0 },
+    { "document": "attestation-assurance-rc-pro.md", "categorie": "banque-assurance", "action": false, "urgence": 0 },
+    { "document": "fiche-paie-aout-2026.txt", "categorie": "rh", "action": false, "urgence": 0 },
+    { "document": "candidature-developpeuse.md", "categorie": "rh", "action": true },
+    { "document": "compte-rendu-reunion-lancement.md", "categorie": "compte-rendu", "action": false, "urgence": 0 },
+    { "document": "notes-idees-produit.md", "categorie": "autre", "action": false, "urgence": 0 }
+  ],
+  "recherche": [
+    { "requete": "combien coûte la maintenance du site par mois", "pertinents": ["contrat-maintenance-site.txt"] },
+    { "requete": "jusqu'à quand payer l'impôt sur le local", "pertinents": ["avis-taxe-fonciere-2026.txt"] },
+    { "requete": "quel prestataire menace de couper le site et les mails", "pertinents": ["relance-facture-hebergeur.md"] },
+    { "requete": "combien réclame l'organisme de recouvrement", "pertinents": ["urssaf-mise-en-demeure.txt"] },
+    { "requete": "suis-je couvert si un client réclame des dommages", "pertinents": ["attestation-assurance-rc-pro.md"] },
+    { "requete": "prix des flyers imprimés", "pertinents": ["facture-imprimerie-lumen.txt"] },
+    { "requete": "quand le nouveau site de la boulangerie sera-t-il en ligne", "pertinents": ["compte-rendu-reunion-lancement.md"] },
+    { "requete": "salaire net de Sophie en août", "pertinents": ["fiche-paie-aout-2026.txt"] },
+    { "requete": "quelle candidate est disponible en novembre", "pertinents": ["candidature-developpeuse.md"] },
+    { "requete": "acompte demandé pour l'application mobile", "pertinents": ["devis-application-mobile.md"] },
+    { "requete": "quel document dois-je signer avant la fin octobre", "pertinents": ["devis-application-mobile.md"] }
+  ],
+  "resume": [
+    { "document": "facture-imprimerie-lumen.txt", "faits": [["1 250", "1250"], ["15 octobre"], ["Lumen"], ["500"]] },
+    { "document": "relance-facture-hebergeur.md", "faits": [["89,90", "89.90"], ["30 septembre"], ["suspen"]] },
+    { "document": "devis-application-mobile.md", "faits": [["3 200", "3200"], ["30 %", "30%"], ["20 octobre"]] },
+    { "document": "contrat-maintenance-site.txt", "faits": [["douze mois", "12 mois"], ["180"], ["préavis"]] },
+    { "document": "urssaf-mise-en-demeure.txt", "faits": [["2 340", "2340"], ["huit jours", "8 jours"], ["mise en demeure"]] }
+  ],
+  "criteres": {
+    "toleranceQualite": 5
+  }
+}

@@ -1,0 +1,23 @@
+CONTRAT DE MAINTENANCE DE SITE INTERNET
+
+Entre les soussignés :
+Atelier Web Horizon, 8 avenue du Port, 17000 La Rochelle, ci-après « le Prestataire »,
+et
+la Boulangerie Martin, 3 place du Marché, 17000 La Rochelle, représentée par M. Paul Martin, ci-après « le Client ».
+
+Article 1 - Objet
+Le Prestataire assure la maintenance du site boulangerie-martin.exemple.fr : mises à jour de sécurité, sauvegardes hebdomadaires, surveillance de la disponibilité et petites modifications de contenu (deux heures par mois au plus).
+
+Article 2 - Durée
+Le contrat est conclu pour une durée de douze mois à compter du 1er octobre 2026. Il se renouvelle ensuite par tacite reconduction, par périodes de douze mois.
+
+Article 3 - Prix
+Le prix de la maintenance est fixé à 180 € HT par mois, payable mensuellement à réception de facture. Les heures de modification au-delà du forfait sont facturées 60 € HT l'heure.
+
+Article 4 - Résiliation
+Chaque partie peut résilier le contrat par lettre recommandée, en respectant un préavis de deux mois avant l'échéance.
+
+Fait à La Rochelle, le 15 septembre 2026, en deux exemplaires.
+
+Pour le Prestataire : signé
+Pour le Client : signé

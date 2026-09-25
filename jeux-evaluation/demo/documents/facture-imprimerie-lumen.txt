@@ -1,0 +1,25 @@
+IMPRIMERIE LUMEN
+12 rue des Presses, 59000 Lille
+SIRET 123 456 789 00012 - contact@imprimerie-lumen.exemple.fr
+
+FACTURE N° FA-2026-0412
+Date : 18 septembre 2026
+
+Client : Atelier Web Horizon
+8 avenue du Port, 17000 La Rochelle
+
+Désignation                                   Qté    Prix unitaire HT    Total HT
+Flyers A5 recto verso, papier 135 g           500    1,40 €              700,00 €
+Affiches A3 couleur                            50    6,50 €              325,00 €
+Frais de livraison                              1    16,67 €              16,67 €
+
+Total HT : 1 041,67 €
+TVA 20 % : 208,33 €
+Total TTC : 1 250,00 €
+
+Conditions de paiement : à régler au plus tard le 15 octobre 2026, par virement.
+IBAN : FR76 1234 5678 9012 3456 7890 123 - BIC : LUMEFRPPXXX
+
+En cas de retard de paiement, des pénalités au taux de trois fois le taux d'intérêt légal seront appliquées, ainsi qu'une indemnité forfaitaire de 40 € pour frais de recouvrement.
+
+Merci de votre confiance.
