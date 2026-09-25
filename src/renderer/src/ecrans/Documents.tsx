@@ -23,7 +23,7 @@ function AvancementLecture({ progression, annuler }: { progression: Progression 
   return (
     <div className="avancement">
       <BarreProgression fait={progression.traites} total={progression.total} libelle={libelle} />
-      <button type="button" onClick={annuler}>
+      <button type="button" onClick={annuler} data-infobulle="Arrête la lecture du dossier ; le dossier déjà ouvert reste affiché.">
         Annuler
       </button>
     </div>
@@ -42,6 +42,11 @@ export function EcranDocuments() {
   const profil = etat?.reglages.profil;
   const categories = useMemo(
     () => new Map((etat?.reglages.classement.categories ?? []).map((c) => [c.id, c.libelle])),
+    [etat?.reglages.classement.categories]
+  );
+  // Définition de chaque catégorie, montrée au survol de sa pastille.
+  const definitions = useMemo(
+    () => new Map((etat?.reglages.classement.categories ?? []).map((c) => [c.id, `${c.libelle} : ${c.description}`])),
     [etat?.reglages.classement.categories]
   );
 
@@ -99,6 +104,9 @@ export function EcranDocuments() {
       definirDetail(await api.documents.lire(id));
     });
 
+  /** Bulle d'un bouton : pendant une opération, tous attendent, et la bulle dit pourquoi. */
+  const bulle = (texte: string): string => (operation !== null ? 'Patientez : une opération est en cours.' : texte);
+
   const documents = corpus?.documents ?? [];
   const restants = documents.filter((d) => !d.triage).length;
   const aVerifier = documents.filter((d) => d.triage?.aVerifier).length;
@@ -124,11 +132,22 @@ export function EcranDocuments() {
                 sur ce PC : rien n’est envoyé à cette étape.
               </p>
               <div className="actions">
-                <button type="button" className="principal" disabled={operation !== null} onClick={() => void choisirDossier()}>
+                <button
+                  type="button"
+                  className="principal"
+                  disabled={operation !== null}
+                  onClick={() => void choisirDossier()}
+                  data-infobulle={bulle('Ouvre l’explorateur pour choisir le dossier de vos documents. Les fichiers sont lus sur ce PC.')}
+                >
                   Choisir un dossier…
                 </button>
                 {etat?.dernierDossier && (
-                  <button type="button" disabled={operation !== null} onClick={() => void lireDossier(etat.dernierDossier as string)}>
+                  <button
+                    type="button"
+                    disabled={operation !== null}
+                    onClick={() => void lireDossier(etat.dernierDossier as string)}
+                    data-infobulle={bulle('Relit le dernier dossier ouvert, fichiers ajoutés depuis compris.')}
+                  >
                     Rouvrir {etat.dernierDossier}
                   </button>
                 )}
@@ -142,7 +161,13 @@ export function EcranDocuments() {
                 L’agent donne à chaque document une catégorie, dit s’il demande une action et s’il est urgent. Posez ensuite vos
                 questions dans l’écran Recherche, ou résumez un document en un clic.
               </p>
-              <button type="button" className="lien" onClick={() => allerA('aide')}>
+              <p className="indice">Astuce : survolez un bouton avec la souris, une bulle explique à quoi il sert.</p>
+              <button
+                type="button"
+                className="lien"
+                onClick={() => allerA('aide')}
+                data-infobulle="Ouvre l’écran Aide : premiers pas, choix du mode, installation d’Ollama."
+              >
                 Lire l’aide pour débuter
               </button>
             </li>
@@ -156,24 +181,39 @@ export function EcranDocuments() {
     <section className="ecran ecran-documents">
       <div className="titre-ecran">
         <h1>Documents</h1>
-        <span className="chemin" title={corpus.dossier}>
+        <span className="chemin" data-infobulle={`Dossier ouvert : ${corpus.dossier}`}>
           {corpus.dossier}
         </span>
       </div>
 
       <div className="barre-outils">
-        <button type="button" disabled={operation !== null} onClick={() => void choisirDossier()}>
+        <button
+          type="button"
+          disabled={operation !== null}
+          onClick={() => void choisirDossier()}
+          data-infobulle={bulle('Choisir un autre dossier de documents.')}
+        >
           Changer de dossier…
         </button>
         <button
           type="button"
           disabled={operation !== null}
           onClick={() => void lireDossier(corpus.dossier)}
-          title="Relire le dossier : fichiers ajoutés ou modifiés, options activées"
+          data-infobulle={bulle('Relit le dossier : fichiers ajoutés ou modifiés, options activées dans Réglages.')}
         >
           Actualiser
         </button>
-        <button type="button" className="principal" disabled={operation !== null || restants === 0} onClick={() => void classer()}>
+        <button
+          type="button"
+          className="principal"
+          disabled={operation !== null || restants === 0}
+          onClick={() => void classer()}
+          data-infobulle={bulle(
+            restants === 0
+              ? 'Chaque document a sa catégorie. Pour en reclasser un, cliquez dessus puis sur « Reclasser ».'
+              : 'Donne à chaque document une catégorie, dit s’il demande une action et s’il est urgent. La durée dépend du mode choisi.'
+          )}
+        >
           {restants === 0
             ? 'Tous les documents sont classés'
             : restants === documents.length
@@ -181,7 +221,7 @@ export function EcranDocuments() {
               : `Classer les ${restants} restants`}
         </button>
         <span className="separateur" />
-        <label>
+        <label data-infobulle="N’afficher que les documents d’une catégorie.">
           Catégorie{' '}
           <select value={filtre} onChange={(e) => definirFiltre(e.target.value)}>
             <option value="">Toutes</option>
@@ -192,7 +232,7 @@ export function EcranDocuments() {
             ))}
           </select>
         </label>
-        <label className="case" title="Documents dont la catégorie est incertaine">
+        <label className="case" data-infobulle="N’afficher que les documents dont la catégorie est incertaine (⚠).">
           <input type="checkbox" checked={seulementAVerifier} onChange={(e) => definirSeulementAVerifier(e.target.checked)} />À
           vérifier seulement
         </label>
@@ -227,7 +267,7 @@ export function EcranDocuments() {
       )}
       {corpus.erreurs.length > 0 && (
         <details className="erreurs-lecture">
-          <summary>{corpus.erreurs.length} fichier(s) non lu(s)</summary>
+          <summary data-infobulle="Fichiers que l’agent n’a pas pu lire, et pourquoi.">{corpus.erreurs.length} fichier(s) non lu(s)</summary>
           <ul>
             {corpus.erreurs.map((e) => (
               <li key={e.chemin}>
@@ -243,11 +283,17 @@ export function EcranDocuments() {
           <table>
             <thead>
               <tr>
-                <th>Document</th>
-                <th>Catégorie</th>
-                <th title="Certitude de l’agent sur la catégorie">Confiance</th>
-                <th title="Le document demande-t-il une action : payer, répondre, signer ?">Action à faire</th>
-                <th>Urgence</th>
+                <th data-infobulle="Nom du fichier. Cliquez sur une ligne pour classer le document, le résumer ou lire son texte.">
+                  Document
+                </th>
+                <th data-infobulle="Type du document selon l’agent : facture, devis, contrat… Survolez une catégorie pour sa définition.">
+                  Catégorie
+                </th>
+                <th data-infobulle="Certitude de l’agent sur la catégorie. Sous le seuil, le document est marqué « à vérifier » (⚠).">
+                  Confiance
+                </th>
+                <th data-infobulle="Le document demande-t-il une action : payer, répondre, signer ?">Action à faire</th>
+                <th data-infobulle="Aucune, bientôt, ou urgente : échéance proche, relance, pénalités.">Urgence</th>
               </tr>
             </thead>
             <tbody>
@@ -263,16 +309,21 @@ export function EcranDocuments() {
                   <td>
                     <span className="nom-document">{d.nom}</span>
                     {d.pagesOcr ? (
-                      <span title={`${d.pagesOcr} page(s) scannée(s) lue(s) par OCR`}>
+                      <>
                         {' '}
-                        <Pastille ton="neutre">OCR</Pastille>
-                      </span>
+                        <Pastille ton="neutre" infobulle={`${d.pagesOcr} page(s) scannée(s) : leur texte a été lu dans l’image (OCR).`}>
+                          OCR
+                        </Pastille>
+                      </>
                     ) : null}
                     {d.id !== d.nom && <span className="dossier-document">{d.id.slice(0, -d.nom.length)}</span>}
                   </td>
                   <td>
                     {d.triage ? (
-                      <Pastille ton={d.triage.aVerifier ? 'alerte' : 'accent'}>
+                      <Pastille
+                        ton={d.triage.aVerifier ? 'alerte' : 'accent'}
+                        infobulle={definitions.get(d.triage.categorie) ?? d.triage.categorie}
+                      >
                         {categories.get(d.triage.categorie) ?? d.triage.categorie}
                       </Pastille>
                     ) : (
@@ -281,7 +332,7 @@ export function EcranDocuments() {
                   </td>
                   <td
                     className={d.triage?.aVerifier ? 'a-verifier' : undefined}
-                    title={d.triage?.aVerifier ? 'À vérifier : l’agent hésite sur la catégorie' : undefined}
+                    {...(d.triage?.aVerifier ? { 'data-infobulle': 'À vérifier : l’agent hésite sur la catégorie.' } : {})}
                   >
                     {d.triage ? `${formaterPourcentage(d.triage.confiance)}${d.triage.aVerifier ? ' ⚠' : ''}` : '–'}
                   </td>
@@ -306,13 +357,32 @@ export function EcranDocuments() {
                 {detail.pagesOcr ? ` · ${detail.pagesOcr} page(s) lue(s) par OCR` : ''}
               </p>
               <div className="actions">
-                <button type="button" onClick={() => void api.documents.ouvrir(detail.id).catch((e: unknown) => definirErreur(messageErreur(e)))}>
+                <button
+                  type="button"
+                  onClick={() => void api.documents.ouvrir(detail.id).catch((e: unknown) => definirErreur(messageErreur(e)))}
+                  data-infobulle="Ouvre le document avec le logiciel habituel de ce PC."
+                >
                   Ouvrir le fichier
                 </button>
-                <button type="button" disabled={operation !== null} onClick={() => void classer([detail.id])}>
+                <button
+                  type="button"
+                  disabled={operation !== null}
+                  onClick={() => void classer([detail.id])}
+                  data-infobulle={bulle('Classe ce document seul : catégorie, action à faire, urgence.')}
+                >
                   {detail.triage ? 'Reclasser' : 'Classer'}
                 </button>
-                <button type="button" className="principal" disabled={operation !== null} onClick={() => void resumer(detail.id)}>
+                <button
+                  type="button"
+                  className="principal"
+                  disabled={operation !== null}
+                  onClick={() => void resumer(detail.id)}
+                  data-infobulle={bulle(
+                    detail.resume
+                      ? 'Écrit un nouveau résumé, par exemple après un changement de mode.'
+                      : 'Écrit un résumé factuel du document avec le mode choisi en haut de la fenêtre.'
+                  )}
+                >
                   {operation === 'resume' ? 'Résumé en cours…' : detail.resume ? 'Refaire le résumé' : 'Résumer'}
                 </button>
               </div>
@@ -325,12 +395,25 @@ export function EcranDocuments() {
                     .sort((a, b) => b[1] - a[1])
                     .slice(0, 3)
                     .map(([id, p]) => (
-                      <Jauge key={id} valeur={p} libelle={categories.get(id) ?? id} />
+                      <Jauge
+                        key={id}
+                        valeur={p}
+                        libelle={categories.get(id) ?? id}
+                        aide={`Probabilité que ce document soit de catégorie « ${categories.get(id) ?? id} »`}
+                      />
                     ))}
-                  <Jauge valeur={detail.triage.probabiliteAction} libelle="Action à faire" />
+                  <Jauge
+                    valeur={detail.triage.probabiliteAction}
+                    libelle="Action à faire"
+                    aide="Probabilité que le document demande une action : payer, répondre, signer"
+                  />
                   <p>
                     Urgence : <Urgence note={detail.triage.urgence} />{' '}
-                    {detail.triage.aVerifier && <Pastille ton="alerte">À vérifier</Pastille>}
+                    {detail.triage.aVerifier && (
+                      <Pastille ton="alerte" infobulle="L’agent hésite sur la catégorie : vérifiez-la d’un coup d’œil.">
+                        À vérifier
+                      </Pastille>
+                    )}
                   </p>
                   <BilanMesures mesures={detail.triage.mesures} />
                 </section>
@@ -345,7 +428,7 @@ export function EcranDocuments() {
               )}
 
               <details className="bloc">
-                <summary>Texte lu par l’agent</summary>
+                <summary data-infobulle="Le début du texte extrait du fichier, tel que l’agent le lit.">Texte lu par l’agent</summary>
                 <pre className="apercu">{detail.apercu}</pre>
               </details>
             </>

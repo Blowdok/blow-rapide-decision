@@ -953,3 +953,40 @@ a {
   padding: 0.4rem 0.6rem;
   font-family: ui-monospace, Consolas, monospace;
 }
+
+/* Bulles d'information : au survol ou au clavier, elles disent à quoi sert chaque élément. */
+
+.infobulle {
+  position: fixed;
+  z-index: 1000;
+  max-width: 320px;
+  padding: 0.4rem 0.65rem;
+  border-radius: 6px;
+  background: var(--texte);
+  color: var(--fond);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 22%);
+  animation: apparition-infobulle 120ms ease-out;
+}
+
+@keyframes apparition-infobulle {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .infobulle {
+    animation: none;
+  }
+}
+
+/* Un libellé ou une pastille qui s'explique au survol le montre par son curseur. */
+th[data-infobulle],
+span[data-infobulle],
+p[data-infobulle],
+div.marque[data-infobulle] {
+  cursor: help;
+}

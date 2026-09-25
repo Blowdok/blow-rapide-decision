@@ -84,13 +84,29 @@ export function EtatPreparation({ actif = true, apresVerification }: { actif?: b
             const utile = necessaires.includes(s.service);
             return (
               <li key={s.service}>
-                <Pastille ton={s.ok ? 'succes' : utile ? 'danger' : 'neutre'}>{s.ok ? 'prêt' : utile ? 'à corriger' : 'facultatif'}</Pastille>{' '}
+                <Pastille
+                  ton={s.ok ? 'succes' : utile ? 'danger' : 'neutre'}
+                  infobulle={
+                    s.ok
+                      ? 'Ce service répond : rien à faire.'
+                      : utile
+                        ? `Le mode ${libelle} a besoin de ce service : suivez le conseil à droite.`
+                        : `Le mode ${libelle} n’a pas besoin de ce service : vous pouvez l’ignorer.`
+                  }
+                >
+                  {s.ok ? 'prêt' : utile ? 'à corriger' : 'facultatif'}
+                </Pastille>{' '}
                 <strong>{s.service}</strong> : {s.detail}
                 {!s.ok && utile && (
                   <span className="conseil">
                     {' '}
                     {CONSEILS[s.service].texte}{' '}
-                    <button type="button" className="lien" onClick={() => allerA('aide', CONSEILS[s.service].sujet)}>
+                    <button
+                      type="button"
+                      className="lien"
+                      onClick={() => allerA('aide', CONSEILS[s.service].sujet)}
+                      data-infobulle="Ouvre l’aide pas à pas pour préparer ce service."
+                    >
                       Comment faire ?
                     </button>
                   </span>
@@ -101,11 +117,20 @@ export function EtatPreparation({ actif = true, apresVerification }: { actif?: b
         </ul>
       )}
       <div className="actions">
-        <button type="button" onClick={() => void verifier()} disabled={enCours}>
+        <button
+          type="button"
+          onClick={() => void verifier()}
+          disabled={enCours}
+          data-infobulle="Relance la vérification d’Ollama, d’OpenRouter et de Jev, par exemple après une installation. Gratuit."
+        >
           {enCours ? 'Vérification…' : 'Vérifier à nouveau'}
         </button>
         {manquants.length > 0 && (
-          <button type="button" onClick={() => void enregistrerReglages({ profil: 'reference' })}>
+          <button
+            type="button"
+            onClick={() => void enregistrerReglages({ profil: 'reference' })}
+            data-infobulle="Passe au mode Référence sans IA, qui marche sans rien installer. Vous pourrez revenir au mode choisi en haut de la fenêtre."
+          >
             Essayer sans IA en attendant
           </button>
         )}

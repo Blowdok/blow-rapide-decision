@@ -9,26 +9,83 @@ import { EcranComparaison } from './ecrans/Comparaison';
 import { EcranDocuments } from './ecrans/Documents';
 import { EcranRecherche } from './ecrans/Recherche';
 import { EcranReglages } from './ecrans/Reglages';
+import { Infobulles } from './infobulles';
 
-const ONGLETS: Array<{ id: Ecran; libelle: string; aide: string }> = [
-  { id: 'documents', libelle: 'Documents', aide: 'Classer et résumer vos fichiers' },
-  { id: 'recherche', libelle: 'Recherche', aide: 'Poser une question' },
-  { id: 'comparaison', libelle: 'Comparaison', aide: 'Choisir entre local et hybride' },
-  { id: 'reglages', libelle: 'Réglages', aide: 'Clés, options, préférences' },
-  { id: 'aide', libelle: 'Aide', aide: 'Premiers pas et questions' }
+const ONGLETS: Array<{ id: Ecran; libelle: string; aide: string; infobulle: string }> = [
+  {
+    id: 'documents',
+    libelle: 'Documents',
+    aide: 'Classer et résumer vos fichiers',
+    infobulle: 'Choisir un dossier, classer chaque document (catégorie, action, urgence) et le résumer.'
+  },
+  {
+    id: 'recherche',
+    libelle: 'Recherche',
+    aide: 'Poser une question',
+    infobulle: 'Poser une question en français : l’agent trouve les passages de vos documents qui y répondent.'
+  },
+  {
+    id: 'comparaison',
+    libelle: 'Comparaison',
+    aide: 'Choisir entre local et hybride',
+    infobulle: 'Faire passer un même examen aux modes pour savoir lequel convient le mieux.'
+  },
+  {
+    id: 'reglages',
+    libelle: 'Réglages',
+    aide: 'Clés, options, préférences',
+    infobulle: 'Vérifier que l’agent est prêt, saisir la clé OpenRouter, régler la confidentialité et les options.'
+  },
+  {
+    id: 'aide',
+    libelle: 'Aide',
+    aide: 'Premiers pas et questions',
+    infobulle: 'Premiers pas, choix du mode, installation d’Ollama et réponses aux questions courantes.'
+  }
 ];
+
+/** Ce que chaque mode fait des données, pour la pastille de l'en-tête. */
+const DONNEES_DU_MODE = {
+  local: 'Aucun document ne quitte ce PC : l’IA tourne sur l’ordinateur, avec Ollama.',
+  reference: 'Ni IA ni envoi : de simples règles sur les mots, hors ligne.',
+  hybride: 'Des extraits partent chez OpenRouter et Jev. Courriels, téléphones, IBAN, cartes et numéros de sécurité sociale sont masqués avant l’envoi.',
+  hybrideSansMasquage: 'Des extraits partent chez OpenRouter et Jev sans masquage : le masquage se réactive dans Réglages, rubrique Confidentialité.'
+};
+
+/** À quoi sert chaque thème. */
+const INFOBULLES_THEME: Record<Theme, string> = {
+  systeme: 'Suit le choix clair ou sombre du système.',
+  clair: 'Fond clair, confortable en journée.',
+  sombre: 'Fond sombre, plus reposant pour les yeux le soir.'
+};
 
 /** Où vont les données dans le mode choisi. */
 function Confidentialite() {
   const { etat } = useApplication();
   if (!etat) return null;
   const { profil, confidentialite } = etat.reglages;
-  if (profil === 'local') return <span className="confidentialite confidentialite-locale">Tout reste sur ce PC</span>;
-  if (profil === 'reference') return <span className="confidentialite">Hors ligne, sans IA</span>;
+  if (profil === 'local') {
+    return (
+      <span className="confidentialite confidentialite-locale" data-infobulle={DONNEES_DU_MODE.local}>
+        Tout reste sur ce PC
+      </span>
+    );
+  }
+  if (profil === 'reference') {
+    return (
+      <span className="confidentialite" data-infobulle={DONNEES_DU_MODE.reference}>
+        Hors ligne, sans IA
+      </span>
+    );
+  }
   return confidentialite.masquage ? (
-    <span className="confidentialite confidentialite-distante">Extraits envoyés à OpenRouter et Jev · données personnelles masquées</span>
+    <span className="confidentialite confidentialite-distante" data-infobulle={DONNEES_DU_MODE.hybride}>
+      Extraits envoyés à OpenRouter et Jev · données personnelles masquées
+    </span>
   ) : (
-    <span className="confidentialite confidentialite-risque">Extraits envoyés sans masquage</span>
+    <span className="confidentialite confidentialite-risque" data-infobulle={DONNEES_DU_MODE.hybrideSansMasquage}>
+      Extraits envoyés sans masquage
+    </span>
   );
 }
 
@@ -54,7 +111,7 @@ function SelecteurMode() {
             role="radio"
             aria-checked={etat.reglages.profil === id}
             className={etat.reglages.profil === id ? 'segment actif' : 'segment'}
-            title={PROFILS[id].description}
+            data-infobulle={PROFILS[id].description}
             onClick={() => void changer(id)}
           >
             {PROFILS[id].libelle}
@@ -62,7 +119,12 @@ function SelecteurMode() {
         ))}
       </div>
       <Confidentialite />
-      <button type="button" className="lien" onClick={() => allerA('aide', 'modes')}>
+      <button
+        type="button"
+        className="lien"
+        onClick={() => allerA('aide', 'modes')}
+        data-infobulle="Ouvre l’aide qui compare les trois modes : confidentialité, coût, installation."
+      >
         Quel mode choisir ?
       </button>
       {erreur && <Message type="erreur">{erreur}</Message>}
@@ -88,6 +150,7 @@ function SelecteurTheme() {
             role="radio"
             aria-checked={actuel === theme}
             className={actuel === theme ? 'segment actif' : 'segment'}
+            data-infobulle={INFOBULLES_THEME[theme]}
             onClick={() => void enregistrerReglages({ apparence: { theme } })}
           >
             {THEMES[theme]}
@@ -107,8 +170,9 @@ export function App() {
   }, [ecran]);
   return (
     <div className="application">
+      <Infobulles />
       <aside className="barre-laterale">
-        <div className="marque">
+        <div className="marque" data-infobulle="Agent de bureau : il lit vos documents, les classe, les résume et répond à vos questions.">
           <span className="marque-nom">Blow Rapide Décision</span>
           <span className="marque-sous-titre">Agent de bureau · Jev</span>
         </div>
@@ -119,6 +183,7 @@ export function App() {
               type="button"
               className={ecran === o.id ? 'onglet actif' : 'onglet'}
               aria-current={ecran === o.id ? 'page' : undefined}
+              data-infobulle={o.infobulle}
               onClick={() => allerA(o.id)}
             >
               <span className="onglet-libelle">{o.libelle}</span>
