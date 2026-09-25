@@ -1,0 +1,22 @@
+BANQUE DU LITTORAL
+Relevé de compte courant professionnel n° 08 - août 2026
+
+Titulaire : Atelier Web Horizon
+IBAN : FR76 9876 5432 1098 7654 3210 987
+
+Solde au 1er août 2026 : 8 412,36 €
+
+Date    Libellé                                         Débit        Crédit
+02/08   Prélèvement loyer bureau                        650,00 €
+05/08   Virement reçu Boulangerie Martin                              960,00 €
+08/08   Prélèvement électricité                          74,20 €
+12/08   Carte : fournitures de bureau                    58,90 €
+19/08   Virement reçu Cabinet Durand                                2 400,00 €
+26/08   Prélèvement abonnement internet                  39,99 €
+30/08   Frais de tenue de compte                         12,00 €
+
+Total des débits : 835,09 €
+Total des crédits : 3 360,00 €
+Solde au 31 août 2026 : 10 937,27 €
+
+Ce relevé est à conserver. Aucune action n'est requise de votre part.

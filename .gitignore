@@ -10,3 +10,12 @@
 .DS_Store
 Thumbs.db
 *~
+
+# Dépendances, builds et rapports générés.
+node_modules/
+out/
+dist/
+*.tsbuildinfo
+rapports/
+test-results/
+playwright-report/
