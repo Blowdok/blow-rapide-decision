@@ -35,18 +35,17 @@ Mise à jour : 25 septembre 2026. À lire au début de chaque session, à mettre
 - 25 septembre 2026, après le signalement d’une clé refusée sous Hyprland, Electron sélectionne `gnome-libsecret` uniquement dans cet environnement; le refus de stockage en clair reste en place ([RAD 0007](decisions/0007-trousseau-hyprland.md)). Aucune clé réelle n’a été saisie.
 - 25 septembre 2026, Blowdok a précisé que « classer » devait conduire à un rangement concret. L’écran Documents propose maintenant un aperçu éditable, envoie les résultats incertains vers « À vérifier », puis crée une copie rangée avec un bilan CSV; les sources ne sont jamais déplacées ([RAD 0008](decisions/0008-copie-classee-apres-validation.md)).
 - Vérifications : `npm run typecheck`, 176 tests unitaires, compilation de production et 13 tests E2E passent; la copie du corpus de démonstration est testée et les originaux restent présents.
-- Aucun appel réel à Jev/OpenRouter ni aucun document personnel n’a été utilisé pour cette livraison. La qualité de Jev sur les documents de Blowdok et son coût restent à évaluer après accord pour l’envoi et la dépense. Les modifications sont sur la branche `fonction/rangement-documentaire-valide` et restent à fusionner dans `main`.
+- Aucun appel réel à Jev/OpenRouter ni aucun document personnel n’a été utilisé pour cette livraison. La qualité de Jev sur les documents de Blowdok et son coût restent à évaluer après accord pour l’envoi et la dépense. Les changements de cette livraison ont été fusionnés en fast-forward dans `main` et poussés sur `origin/main`.
 
 ## Prochaine action
 
-1. Fusionner `fonction/rangement-documentaire-valide` dans `main` après revue.
-2. Sur le PC de Blowdok, lancer `npm run dev`, ouvrir le jeu fictif de 12 documents en mode « Référence sans IA », préparer la copie vers un dossier temporaire et vérifier le bilan CSV ainsi que l’intégrité des sources.
-3. Si Blowdok veut évaluer Jev, saisir la clé OpenRouter dans les réglages de l’application, lancer le diagnostic, puis autoriser explicitement l’envoi et le coût avant tout essai Hybride. Commencer par le jeu fictif; aucune clé dans le chat.
-4. Comparer les trois modes sur le jeu de démonstration et juger la qualité des décisions de Jev en français, son coût et les résultats « à vérifier ». Si Jev ne bat pas clairement le modèle local ou la référence, ne pas le retenir pour le tri réel.
-5. N’essayer le mode Hybride sur des documents personnels qu’après accord explicite sur les données envoyées et la dépense; vérifier l’aperçu, corriger les destinations, puis confirmer la copie.
-6. Comparer les autres petits modèles locaux (`gemma3:4b`, `granite4.2:3b`, `gemma4:e2b`) dans Réglages et le banc.
-7. Constituer, si Blowdok l’autorise, un jeu d’évaluation représentatif de 20 à 50 documents, puis valider la tolérance de 5 points et les critères du banc ([RAD 0004](decisions/0004-banc-de-decision.md)).
-8. Faire suivre l’accueil en trois étapes à un débutant sans aide ([RAD 0006](decisions/0006-interface-pour-debutant.md)) et essayer les options locales ([RAD 0005](decisions/0005-options-semantique-et-ocr.md)).
+1. Sur le PC de Blowdok, ouvrir l’application si nécessaire, puis lancer le jeu fictif de 12 documents en mode « Référence sans IA », préparer la copie vers un dossier temporaire et vérifier le bilan CSV ainsi que l’intégrité des sources.
+2. Si Blowdok veut évaluer Jev, saisir la clé OpenRouter dans les réglages de l’application, lancer le diagnostic, puis autoriser explicitement l’envoi et le coût avant tout essai Hybride. Commencer par le jeu fictif; aucune clé dans le chat.
+3. Comparer les trois modes sur le jeu de démonstration et juger la qualité des décisions de Jev en français, son coût et les résultats « à vérifier ». Si Jev ne bat pas clairement le modèle local ou la référence, ne pas le retenir pour le tri réel.
+4. N’essayer le mode Hybride sur des documents personnels qu’après accord explicite sur les données envoyées et la dépense; vérifier l’aperçu, corriger les destinations, puis confirmer la copie.
+5. Comparer les autres petits modèles locaux (`gemma3:4b`, `granite4.2:3b`, `gemma4:e2b`) dans Réglages et le banc.
+6. Constituer, si Blowdok l’autorise, un jeu d’évaluation représentatif de 20 à 50 documents, puis valider la tolérance de 5 points et les critères du banc ([RAD 0004](decisions/0004-banc-de-decision.md)).
+7. Faire suivre l’accueil en trois étapes à un débutant sans aide ([RAD 0006](decisions/0006-interface-pour-debutant.md)) et essayer les options locales ([RAD 0005](decisions/0005-options-semantique-et-ocr.md)).
 
 ## Décisions
 
