@@ -53,7 +53,7 @@ npm install    # télécharge aussi Electron, une centaine de Mo, une seule fois
 npm start      # construit puis ouvre l'application
 ```
 
-Au lancement, l'accueil vérifie ce qui manque pour le mode choisi et dit quoi faire. Il n'y a pas encore d'installeur Windows : l'application se lance depuis ce dossier, avec `npm start`. Après une mise à jour (`git pull`), relancer `npm install` puis `npm start`.
+Au lancement, l'accueil vérifie ce qui manque pour le mode choisi et dit quoi faire. Il n'y a pas encore d'installeur, ni sous Linux ni sous Windows : l'application se lance depuis ce dossier, avec `npm start`. Après une mise à jour (`git pull`), relancer `npm install` puis `npm start`.
 
 **Mode local** : installer [Ollama](https://ollama.com) (0.12.11 ou plus récent, pour les probabilités des décisions), puis le modèle par défaut, s'il n'est pas déjà là :
 
