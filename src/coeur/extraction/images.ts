@@ -1,12 +1,14 @@
-// Images des pages scannées : extraction depuis le PDF, réduction et encodage
-// PNG, pour la lecture OCR facultative. Aucune dépendance native : PDF.js
-// décode les images, zlib compresse le PNG.
+// Images des pages scannées, pour la lecture OCR facultative : la page est
+// recomposée à partir de ses images (bandes, masques noir et blanc, rotation),
+// puis réduite et encodée en PNG. Aucune dépendance native : PDF.js décode les
+// images, zlib compresse le PNG.
 
 import { crc32, deflateSync } from 'node:zlib';
-import type { getDocumentProxy } from 'unpdf';
+import type { getDocumentProxy, getResolvedPDFJS } from 'unpdf';
 
 type DocumentPdf = Awaited<ReturnType<typeof getDocumentProxy>>;
 export type PagePdf = Awaited<ReturnType<DocumentPdf['getPage']>>;
+type Operations = Awaited<ReturnType<typeof getResolvedPDFJS>>['OPS'];
 
 /** Image en niveaux de gris (1 octet par pixel) ou en RVB (3 octets par pixel). */
 export interface ImageBrute {
@@ -16,24 +18,58 @@ export interface ImageBrute {
   pixels: Uint8Array;
 }
 
+/** Image prête à poser sur la page : gris, et opacité si elle n'est pas entièrement opaque. */
+export interface Calque {
+  largeur: number;
+  hauteur: number;
+  gris: Uint8Array;
+  /** Opacité de 0 à 255 ; `null` si l'image est opaque. */
+  alpha: Uint8Array | null;
+}
+
 /** Image décodée par PDF.js. `kind` : 1 = 1 bit par pixel, 2 = RVB, 3 = RVBA. */
 interface ImagePdfJs {
   width?: number;
   height?: number;
   kind?: number;
-  data?: Uint8Array | Uint8ClampedArray;
+  data?: Uint8Array | Uint8ClampedArray | string;
 }
 
-/** Côté minimal, en pixels, d'une image de page scannée : en dessous, c'est un logo ou une icône. */
+/** Matrice affine de PDF.js [a, b, c, d, e, f] : x' = a·x + c·y + e, y' = b·x + d·y + f. */
+type Matrice = [number, number, number, number, number, number];
+
+/** Côté minimal, en pixels, de la plus grande image d'une page scannée : en dessous, c'est un logo ou une icône. */
 export const COTE_MIN_SCAN = 300;
+
+/** Part de la page que les images doivent couvrir pour qu'elle soit tenue pour scannée. */
+export const COUVERTURE_MIN_SCAN = 0.25;
+
+/** Plus grand côté de la page recomposée : assez pour lire un scan à 300 points par pouce. */
+const COTE_MAX_RECOMPOSITION = 3000;
 
 /** Délai d'attente d'une image que PDF.js n'arrive pas à décoder. */
 const DELAI_IMAGE_MS = 15_000;
 
-/** Convertit une image de PDF.js ; `null` si son format n'est pas reconnu. */
-export function depuisPdfJs(image: ImagePdfJs): ImageBrute | null {
+const luminance = (r: number, g: number, b: number): number => Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+
+/** Déplie des bits empaquetés (lignes complétées à l'octet) : `siUn` pour 1, `siZero` pour 0. */
+function deplierBits(data: ArrayLike<number>, largeur: number, hauteur: number, siUn: number, siZero: number): Uint8Array {
+  const octetsParLigne = (largeur + 7) >> 3;
+  const sortie = new Uint8Array(largeur * hauteur);
+  for (let y = 0; y < hauteur; y++) {
+    const ligne = y * octetsParLigne;
+    for (let x = 0; x < largeur; x++) {
+      const bit = ((data[ligne + (x >> 3)] as number) >> (7 - (x & 7))) & 1;
+      sortie[y * largeur + x] = bit ? siUn : siZero;
+    }
+  }
+  return sortie;
+}
+
+/** Convertit une image décodée par PDF.js ; `null` si son format n'est pas reconnu. */
+export function calqueDepuisPdfJs(image: ImagePdfJs): Calque | null {
   const { width: largeur = 0, height: hauteur = 0, data } = image;
-  if (!data || largeur <= 0 || hauteur <= 0) return null;
+  if (!data || typeof data === 'string' || largeur <= 0 || hauteur <= 0) return null;
   const pixels = largeur * hauteur;
   const octetsParLigne1Bit = (largeur + 7) >> 3;
   const kind =
@@ -41,56 +77,155 @@ export function depuisPdfJs(image: ImagePdfJs): ImageBrute | null {
     (data.length === pixels * 3 ? 2 : data.length === pixels * 4 ? 3 : data.length === octetsParLigne1Bit * hauteur ? 1 : 0);
 
   if (kind === 1 && data.length >= octetsParLigne1Bit * hauteur) {
-    // Bits empaquetés, lignes complétées à l'octet ; PDF.js garde 1 pour le blanc.
+    // PDF.js garde 1 pour le blanc, quel que soit le tableau /Decode du PDF.
+    return { largeur, hauteur, gris: deplierBits(data, largeur, hauteur, 255, 0), alpha: null };
+  }
+  if ((kind === 2 && data.length >= pixels * 3) || (kind === 3 && data.length >= pixels * 4)) {
+    const pas = kind === 2 ? 3 : 4;
     const gris = new Uint8Array(pixels);
-    for (let y = 0; y < hauteur; y++) {
-      const ligne = y * octetsParLigne1Bit;
-      for (let x = 0; x < largeur; x++) {
-        const bit = ((data[ligne + (x >> 3)] as number) >> (7 - (x & 7))) & 1;
-        gris[y * largeur + x] = bit ? 255 : 0;
-      }
-    }
-    return { largeur, hauteur, canaux: 1, pixels: gris };
-  }
-  if (kind === 2 && data.length >= pixels * 3) {
-    return { largeur, hauteur, canaux: 3, pixels: Uint8Array.from(data.subarray(0, pixels * 3)) };
-  }
-  if (kind === 3 && data.length >= pixels * 4) {
-    // Transparence posée sur fond blanc, comme sur une page imprimée.
-    const rvb = new Uint8Array(pixels * 3);
+    const alpha = kind === 3 ? new Uint8Array(pixels) : null;
     for (let i = 0; i < pixels; i++) {
-      const alpha = (data[i * 4 + 3] as number) / 255;
-      for (let c = 0; c < 3; c++) rvb[i * 3 + c] = Math.round((data[i * 4 + c] as number) * alpha + 255 * (1 - alpha));
+      const o = i * pas;
+      gris[i] = luminance(data[o] as number, data[o + 1] as number, data[o + 2] as number);
+      if (alpha) alpha[i] = data[o + 3] as number;
     }
-    return { largeur, hauteur, canaux: 3, pixels: rvb };
+    return { largeur, hauteur, gris, alpha };
   }
   return null;
 }
 
-/** Plus grande image de la page, si elle est assez grande pour être une page scannée. */
-export async function imagePrincipale(page: PagePdf, operationImage: number): Promise<ImageBrute | null> {
-  const operations = await page.getOperatorList();
-  const vues = new Set<string>();
-  let meilleure: ImagePdfJs | null = null;
-  for (let i = 0; i < operations.fnArray.length; i++) {
-    if (operations.fnArray[i] !== operationImage) continue;
-    const cle: unknown = operations.argsArray[i]?.[0];
-    if (typeof cle !== 'string' || vues.has(cle)) continue;
-    vues.add(cle);
-    // Les images partagées entre pages (« g_… ») sont gardées à part par PDF.js.
-    const objets = cle.startsWith('g_') ? page.commonObjs : page.objs;
-    const image = await new Promise<ImagePdfJs | null>((resolve) => {
-      const minuterie = setTimeout(() => resolve(null), DELAI_IMAGE_MS);
-      objets.get(cle, (objet: ImagePdfJs | null) => {
-        clearTimeout(minuterie);
-        resolve(objet);
-      });
-    });
-    if (!image?.data || !image.width || !image.height) continue;
-    if (!meilleure || image.width * image.height > (meilleure.width ?? 0) * (meilleure.height ?? 0)) meilleure = image;
+/** Masque d'image (noir et blanc « à trous ») : 0 peint l'encre, 1 laisse voir ce qui est dessous. */
+export function calqueDepuisMasque(masque: { width?: number; height?: number; data?: ArrayLike<number> }): Calque | null {
+  const { width: largeur = 0, height: hauteur = 0, data } = masque;
+  if (!data || largeur <= 0 || hauteur <= 0 || data.length < ((largeur + 7) >> 3) * hauteur) return null;
+  return {
+    largeur,
+    hauteur,
+    gris: new Uint8Array(largeur * hauteur),
+    alpha: deplierBits(data, largeur, hauteur, 0, 255)
+  };
+}
+
+/** Composition de deux matrices : `locale` s'applique d'abord, puis `parent`. */
+function composer(parent: Matrice, locale: readonly number[]): Matrice {
+  const [a, b, c, d, e, f] = parent;
+  const [a2 = 1, b2 = 0, c2 = 0, d2 = 1, e2 = 0, f2 = 0] = locale;
+  return [a * a2 + c * b2, b * a2 + d * b2, a * c2 + c * d2, b * c2 + d * d2, a * e2 + c * f2 + e, b * e2 + d * f2 + f];
+}
+
+function inverser([a, b, c, d, e, f]: Matrice): Matrice | null {
+  const det = a * d - b * c;
+  if (Math.abs(det) < 1e-12) return null;
+  return [d / det, -b / det, -c / det, a / det, (c * f - d * e) / det, (b * e - a * f) / det];
+}
+
+/** Rectangle occupé à l'écran par le carré unité de l'image, limité à la page. */
+function emprise(m: Matrice, largeur: number, hauteur: number): { x0: number; y0: number; x1: number; y1: number } {
+  const xs = [m[4], m[0] + m[4], m[2] + m[4], m[0] + m[2] + m[4]];
+  const ys = [m[5], m[1] + m[5], m[3] + m[5], m[1] + m[3] + m[5]];
+  return {
+    x0: Math.max(0, Math.floor(Math.min(...xs))),
+    y0: Math.max(0, Math.floor(Math.min(...ys))),
+    x1: Math.min(largeur, Math.ceil(Math.max(...xs))),
+    y1: Math.min(hauteur, Math.ceil(Math.max(...ys)))
+  };
+}
+
+/** Pose un calque sur la page recomposée ; renvoie le nombre de pixels couverts. */
+function poser(page: Uint8Array, largeur: number, hauteur: number, calque: Calque, matrice: Matrice): number {
+  const inverse = inverser(matrice);
+  if (!inverse) return 0;
+  const [ia, ib, ic, id, ie, iff] = inverse;
+  const { x0, y0, x1, y1 } = emprise(matrice, largeur, hauteur);
+  let couverts = 0;
+  for (let y = y0; y < y1; y++) {
+    const py = y + 0.5;
+    for (let x = x0; x < x1; x++) {
+      const px = x + 0.5;
+      // Retour dans le carré unité de l'image ; sa première ligne est en haut (v = 1).
+      const u = ia * px + ic * py + ie;
+      const v = ib * px + id * py + iff;
+      if (u < 0 || u >= 1 || v <= 0 || v > 1) continue;
+      const source = Math.floor((1 - v) * calque.hauteur) * calque.largeur + Math.floor(u * calque.largeur);
+      const g = calque.gris[source] as number;
+      const a = calque.alpha ? (calque.alpha[source] as number) : 255;
+      const cible = y * largeur + x;
+      page[cible] = a === 255 ? g : Math.round(((page[cible] as number) * (255 - a) + g * a) / 255);
+      couverts++;
+    }
   }
-  if (!meilleure || Math.max(meilleure.width ?? 0, meilleure.height ?? 0) < COTE_MIN_SCAN) return null;
-  return depuisPdfJs(meilleure);
+  return couverts;
+}
+
+/** Objet de PDF.js, attendu au plus quelques secondes (une image indécodable n'arrive jamais). */
+function objetPdfJs(page: PagePdf, cle: string): Promise<unknown> {
+  // Les images partagées entre pages (« g_… ») sont gardées à part par PDF.js.
+  const objets = cle.startsWith('g_') ? page.commonObjs : page.objs;
+  return new Promise((resolve) => {
+    const minuterie = setTimeout(() => resolve(null), DELAI_IMAGE_MS);
+    objets.get(cle, (objet: unknown) => {
+      clearTimeout(minuterie);
+      resolve(objet);
+    });
+  });
+}
+
+/**
+ * Recompose une page à partir de ses images, en niveaux de gris, à peu près à
+ * leur résolution d'origine. Bandes, masques, formulaires et rotation de la
+ * page sont pris en compte. `null` si la page n'a pas l'air scannée : pas
+ * d'image, images trop petites, ou couvrant trop peu de la page.
+ */
+export async function imageDeLaPage(page: PagePdf, operations: Operations): Promise<ImageBrute | null> {
+  const liste = await page.getOperatorList();
+  const aPoser: Array<{ calque: Calque; matrice: Matrice }> = [];
+  const pile: Matrice[] = [];
+  let courante: Matrice = [1, 0, 0, 1, 0, 0];
+
+  for (let i = 0; i < liste.fnArray.length; i++) {
+    const operation = liste.fnArray[i];
+    const args = (liste.argsArray[i] ?? []) as unknown[];
+    if (operation === operations.save) pile.push(courante);
+    else if (operation === operations.restore) courante = pile.pop() ?? courante;
+    else if (operation === operations.transform) courante = composer(courante, args as number[]);
+    else if (operation === operations.paintFormXObjectBegin) {
+      pile.push(courante);
+      courante = composer(courante, Array.from((args[0] as ArrayLike<number> | null) ?? [1, 0, 0, 1, 0, 0]));
+    } else if (operation === operations.paintFormXObjectEnd) courante = pile.pop() ?? courante;
+    else if (operation === operations.paintImageXObject || operation === operations.paintInlineImageXObject) {
+      const source = typeof args[0] === 'string' ? await objetPdfJs(page, args[0]) : args[0];
+      const calque = source ? calqueDepuisPdfJs(source as ImagePdfJs) : null;
+      if (calque) aPoser.push({ calque, matrice: courante });
+    } else if (operation === operations.paintImageMaskXObject) {
+      const masque = args[0] as { width?: number; height?: number; data?: unknown } | undefined;
+      const donnees = typeof masque?.data === 'string' ? await objetPdfJs(page, masque.data) : masque;
+      const calque = donnees ? calqueDepuisMasque(donnees as { width?: number; height?: number; data?: ArrayLike<number> }) : null;
+      if (calque) aPoser.push({ calque, matrice: courante });
+    }
+  }
+  if (!aPoser.length || Math.max(...aPoser.map(({ calque }) => Math.max(calque.largeur, calque.hauteur))) < COTE_MIN_SCAN) {
+    return null;
+  }
+
+  // Échelle : la résolution de l'image la plus fine, bornée pour tenir en mémoire.
+  const base = page.getViewport({ scale: 1 });
+  const pixelsParPoint = Math.max(
+    ...aPoser.map(({ calque, matrice }) => {
+      const cote = Math.hypot(matrice[0], matrice[1]) || 1;
+      return calque.largeur / cote;
+    })
+  );
+  const echelle = Math.max(1, Math.min(pixelsParPoint, COTE_MAX_RECOMPOSITION / Math.max(base.width, base.height)));
+  const vue = page.getViewport({ scale: echelle });
+  const largeur = Math.max(1, Math.round(vue.width));
+  const hauteur = Math.max(1, Math.round(vue.height));
+  const ecran = vue.transform as Matrice;
+
+  const pixels = new Uint8Array(largeur * hauteur).fill(255);
+  let couverts = 0;
+  for (const { calque, matrice } of aPoser) couverts += poser(pixels, largeur, hauteur, calque, composer(ecran, matrice));
+  if (couverts < COUVERTURE_MIN_SCAN * largeur * hauteur) return null;
+  return { largeur, hauteur, canaux: 1, pixels };
 }
 
 /** Réduit l'image pour que son plus grand côté ne dépasse pas `coteMax` (moyenne des pixels couverts). */
@@ -121,18 +256,6 @@ export function reduire(image: ImageBrute, coteMax: number): ImageBrute {
     }
   }
   return { largeur: nouvelleLargeur, hauteur: nouvelleHauteur, canaux, pixels: sortie };
-}
-
-/** Passe en niveaux de gris une image RVB dont les trois canaux sont égaux : un PNG trois fois plus léger. */
-export function simplifier(image: ImageBrute): ImageBrute {
-  if (image.canaux === 1) return image;
-  const { pixels } = image;
-  for (let i = 0; i < pixels.length; i += 3) {
-    if (pixels[i] !== pixels[i + 1] || pixels[i] !== pixels[i + 2]) return image;
-  }
-  const gris = new Uint8Array(pixels.length / 3);
-  for (let i = 0; i < gris.length; i++) gris[i] = pixels[i * 3] as number;
-  return { ...image, canaux: 1, pixels: gris };
 }
 
 function bloc(type: string, donnees: Uint8Array): Buffer {

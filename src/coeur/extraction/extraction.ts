@@ -9,10 +9,9 @@ import mammoth from 'mammoth';
 import { extractText, getDocumentProxy, getResolvedPDFJS } from 'unpdf';
 import type { FormatDocument, Mesure } from '../../partage/types';
 import type { LecteurOcr } from '../moteurs/ocr';
-import { ErreurMoteur } from '../moteurs/types';
 import type { CacheTexte } from '../outils/cache';
 import { nettoyerTexte } from '../texte/decoupage';
-import { encoderPng, imagePrincipale, reduire, simplifier } from './images';
+import { encoderPng, type ImageBrute, imageDeLaPage, reduire } from './images';
 
 const FORMATS: Record<string, FormatDocument> = {
   '.txt': 'txt',
@@ -32,7 +31,7 @@ export const CARACTERES_MIN_PAGE = 40;
 export const COTE_MAX_OCR = 1600;
 
 /** Version de la lecture OCR : la changer invalide le cache des pages déjà lues. */
-const VERSION_OCR = 'ocr-1';
+const VERSION_OCR = 'ocr-2';
 
 export function formatDepuisChemin(chemin: string): FormatDocument | null {
   return FORMATS[extname(chemin).toLowerCase()] ?? null;
@@ -83,48 +82,82 @@ export interface Extraction {
   pagesSansTexte: number;
   /** Pages lues par OCR. */
   pagesOcr: number;
-  /** Pages sans texte laissées de côté parce que la limite de pages était atteinte. */
+  /** Pages sans texte non examinées, au-delà de la limite de pages lues. */
   pagesAuDela: number;
-  /** Échec du modèle de vision : les pages restantes n'ont pas été lues. */
+  /** Échec de la lecture OCR : les pages restantes n'ont pas été lues. */
   erreurOcr?: string;
   mesures: Mesure[];
 }
 
+/** Lecture du cache au mieux : un cache illisible vaut un cache vide. */
+async function lireCache(cache: CacheTexte, cle: string): Promise<string | null> {
+  try {
+    return await cache.lire(cle);
+  } catch {
+    return null;
+  }
+}
+
+/** Écriture du cache au mieux : disque plein ou droits manquants, la page sera simplement relue. */
+async function ecrireCache(cache: CacheTexte, cle: string, texte: string): Promise<void> {
+  try {
+    await cache.ecrire(cle, texte);
+  } catch {
+    // Rien à faire : le cache n'est qu'un raccourci.
+  }
+}
+
 async function extrairePdf(octets: Uint8Array, options: OptionsExtraction): Promise<Extraction> {
-  const empreinte = options.ocr?.cache ? createHash('sha256').update(octets).digest('hex') : '';
+  const ocr = options.ocr;
+  const cache = ocr?.cache;
+  const empreinte = cache ? createHash('sha256').update(octets).digest('hex') : '';
   const pdf = await getDocumentProxy(octets);
   try {
     const { text: pages } = await extractText(pdf, { mergePages: false });
     const sansTexte = pages.flatMap((texte, i) => (caracteresVisibles(texte) < CARACTERES_MIN_PAGE ? [i] : []));
     const resultat: Extraction = { texte: '', pagesSansTexte: sansTexte.length, pagesOcr: 0, pagesAuDela: 0, mesures: [] };
-    const ocr = options.ocr;
 
     if (ocr && sansTexte.length) {
-      const aLire = sansTexte.slice(0, ocr.pagesMax);
-      resultat.pagesAuDela = sansTexte.length - aLire.length;
       const { OPS } = await getResolvedPDFJS();
-      for (const [position, indice] of aLire.entries()) {
+      const aLireAuPlus = Math.min(ocr.pagesMax, sansTexte.length);
+      // Seules les pages vraiment lues comptent dans la limite : une page blanche ne la consomme pas.
+      let lues = 0;
+      for (const [position, indice] of sansTexte.entries()) {
         options.signal?.throwIfAborted();
+        if (lues >= ocr.pagesMax) {
+          resultat.pagesAuDela = sansTexte.length - position;
+          break;
+        }
         const cle = `${VERSION_OCR}|${ocr.lecteur.modele}|${empreinte}|${indice + 1}`;
-        let transcription = empreinte ? await ocr.cache?.lire(cle) : null;
-        if (transcription === null || transcription === undefined) {
-          // Page blanche, ou image que PDF.js ne sait pas décoder : rien à lire.
-          const image = await imagePrincipale(await pdf.getPage(indice + 1), OPS.paintImageXObject).catch(() => null);
-          if (!image) continue;
-          options.surPageOcr?.(position + 1, aLire.length);
+        let transcription = cache ? await lireCache(cache, cle) : null;
+        if (transcription === null) {
+          const page = await pdf.getPage(indice + 1);
+          let image: ImageBrute | null;
           try {
-            const lecture = await ocr.lecteur.lire(encoderPng(simplifier(reduire(image, COTE_MAX_OCR))), {
+            // Page blanche, ou images que PDF.js ne sait pas décoder : rien à lire.
+            image = await imageDeLaPage(page, OPS).catch(() => null);
+          } finally {
+            // PDF.js garde les images décodées jusqu'au nettoyage de la page : sans lui, un long scan remplit la mémoire.
+            page.cleanup();
+          }
+          if (!image) continue;
+          options.surPageOcr?.(lues + 1, aLireAuPlus);
+          try {
+            const lecture = await ocr.lecteur.lire(encoderPng(reduire(image, COTE_MAX_OCR)), {
               ...(options.signal ? { signal: options.signal } : {})
             });
             resultat.mesures.push(lecture.mesure);
             transcription = lecture.texte;
           } catch (erreur) {
-            if (options.signal?.aborted || !(erreur instanceof ErreurMoteur)) throw erreur;
-            resultat.erreurOcr = erreur.message;
+            if (options.signal?.aborted) throw erreur;
+            // Le texte natif du document reste ; les pages scannées suivantes ne sont pas lues.
+            resultat.erreurOcr = (erreur as Error).message;
             break;
           }
-          if (empreinte) await ocr.cache?.ecrire(cle, transcription);
+          // Une lecture vide n'est pas gardée : la page sera relue la prochaine fois.
+          if (cache && transcription) await ecrireCache(cache, cle, transcription);
         }
+        lues += 1;
         if (transcription) {
           // La transcription tient lieu du texte absent ; le peu de texte de la page (en-tête, numéro) reste devant.
           const existant = pages[indice] ?? '';

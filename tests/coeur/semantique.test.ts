@@ -200,6 +200,28 @@ describe('recherche sémantique (option)', () => {
     expect(trouves.candidats[0]?.passage.documentId).toBe('avis-fonciere.txt');
   });
 
+  it('se replie sur les mots-clés si le modèle a changé de taille de vecteurs', async () => {
+    const moteur = moteurSimule();
+    const corpus = await indexerDossier(dossier, { plongement: moteur });
+    // Modèle remplacé sous le même nom : ses vecteurs n'ont plus la même taille.
+    moteur.plonger = async (textes) => ({
+      vecteurs: textes.map(() => normaliser([1, 0, 0])),
+      mesure: { ...nouvelleMesure('plongement', moteur), appels: 1 }
+    });
+    const trouves = await trouverCandidats(corpus, 'taxe foncière', 5, avecOption);
+    expect(trouves.avis).toBe('Recherche sémantique indisponible : Requête de dimension 3 au lieu de 5. Recherche par mots-clés seule.');
+    expect(trouves.candidats[0]?.passage.documentId).toBe('avis-fonciere.txt');
+  });
+
+  it('ne réutilise pas les vecteurs d’un autre serveur', async () => {
+    const memoire = new Map<string, Float32Array>();
+    const premier = Object.assign(moteurSimule(), { origine: 'http://127.0.0.1:11434' });
+    await indexerDossier(dossier, { plongement: premier, memoirePlongements: memoire });
+    const autre = Object.assign(moteurSimule(), { origine: 'http://192.168.1.20:11434' });
+    await indexerDossier(dossier, { plongement: autre, memoirePlongements: memoire });
+    expect(autre.textes.map((t) => t.length)).toEqual([3]);
+  });
+
   it('signale un changement de modèle depuis l’indexation', async () => {
     const corpus = await indexerDossier(dossier, { plongement: moteurSimule('embeddinggemma') });
     const meme = await trouverCandidats(corpus, 'paie', 5, { semantique: true, modele: 'embeddinggemma:latest' });

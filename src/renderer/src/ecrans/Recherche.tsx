@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { termes } from '../../../coeur/texte/normalisation';
 import type { Recherche, ResultatRecherche } from '../../../partage/types';
 import { api, messageErreur } from '../api';
@@ -40,6 +40,12 @@ export function EcranRecherche() {
   const [resultat, definirResultat] = useState<Recherche | null>(null);
   const [enCours, definirEnCours] = useState(false);
   const [erreur, definirErreur] = useState<string | null>(null);
+
+  // Un autre dossier : les résultats précédents ne le concernent plus.
+  useEffect(() => {
+    definirResultat(null);
+    definirErreur(null);
+  }, [corpus?.dossier]);
 
   const lancer = async (texte: string) => {
     definirEnCours(true);

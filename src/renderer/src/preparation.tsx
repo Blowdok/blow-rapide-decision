@@ -23,8 +23,11 @@ const CONSEILS: Record<EtatService['service'], { texte: string; sujet: string }>
   Jev: { texte: 'Jev passe par la même clé OpenRouter.', sujet: 'openrouter' }
 };
 
-/** `apresVerification` : appelé après chaque vérification, par exemple pour relire la liste des modèles. */
-export function EtatPreparation({ apresVerification }: { apresVerification?: () => void } = {}) {
+/**
+ * `actif` : l'écran qui l'affiche est visible ; la vérification repart à chaque retour sur cet écran.
+ * `apresVerification` : appelé après chaque vérification, par exemple pour relire la liste des modèles.
+ */
+export function EtatPreparation({ actif = true, apresVerification }: { actif?: boolean; apresVerification?: () => void }) {
   const { etat, enregistrerReglages, allerA } = useApplication();
   const [services, definirServices] = useState<EtatService[] | null>(null);
   const [enCours, definirEnCours] = useState(false);
@@ -48,10 +51,10 @@ export function EtatPreparation({ apresVerification }: { apresVerification?: () 
     }
   }, []);
 
-  // La vérification est gratuite : elle part dès l'affichage.
+  // La vérification est gratuite : elle part dès que l'écran s'affiche.
   useEffect(() => {
-    void verifier();
-  }, [verifier]);
+    if (actif) void verifier();
+  }, [actif, verifier]);
 
   if (!etat) return null;
   const profil = etat.reglages.profil;
@@ -62,7 +65,9 @@ export function EtatPreparation({ apresVerification }: { apresVerification?: () 
   return (
     <div className="preparation" aria-live="polite">
       {services === null ? (
-        <p className="preparation-verdict">{enCours ? 'Vérification en cours…' : 'Vérification impossible pour l’instant.'}</p>
+        <p className="preparation-verdict">
+          {enCours ? 'Vérification en cours…' : erreur ? 'Vérification impossible pour l’instant.' : 'Pas encore vérifié.'}
+        </p>
       ) : manquants.length === 0 ? (
         <p className="preparation-verdict">
           <Pastille ton="succes">Prêt</Pastille> Le mode {libelle} peut fonctionner

@@ -29,7 +29,7 @@ Application de bureau Electron en TypeScript. Le cœur, sans Electron, extrait l
 
 - `src/partage/` : types du domaine, réglages par défaut, contrat IPC, mise en forme française, synthèse du banc. Sans Node ni DOM : partagé par tous les processus.
 - `src/coeur/` : la logique, testable sans Electron.
-  - `extraction/` : texte des TXT, Markdown (UTF-8 ou Windows-1252), PDF (`unpdf`) et Word (`mammoth`), page par page pour les PDF ; images des pages scannées (décodage PDF.js, réduction, PNG) pour l'option OCR.
+  - `extraction/` : texte des TXT, Markdown (UTF-8 ou Windows-1252), PDF (`unpdf`) et Word (`mammoth`), page par page pour les PDF. Pour l'option OCR, `images.ts` recompose les pages scannées à partir de leurs images (bandes, masques, rotation), puis les réduit et les encode en PNG.
   - `texte/` : normalisation du français (accents, élisions, mots vides, racinisation minimale) et découpage en passages.
   - `index/` : index BM25, index vectoriel et fusion par rang réciproque, corpus d'un dossier et choix des passages candidats.
   - `moteurs/` : contrats `MoteurDecision` et `MoteurRedaction` ; Jev (SDK `@typesafe-ai/sdk`), Ollama, OpenRouter, référence sans IA. Pour les options : `MoteurPlongement` (Ollama `/api/embed`) et `LecteurOcr` (Ollama `/api/chat` avec image).
@@ -41,7 +41,7 @@ Application de bureau Electron en TypeScript. Le cœur, sans Electron, extrait l
 - `src/main/` : processus principal d'Electron. `index.ts` (fenêtre, menu), `ipc.ts` (canaux), `service.ts` (corpus ouvert, caches, journal des envois ; sans Electron), `stockage.ts` (réglages, clés chiffrées).
 - `src/preload/` : expose l'API `window.brd`, et rien d'autre.
 - `src/renderer/` : interface React en français, pensée pour un débutant ([RAD 0006](decisions/0006-interface-pour-debutant.md)).
-  - Écrans : Documents (avec un accueil en trois étapes), Recherche, Comparaison, Réglages (essentiel d'abord, réglages avancés repliés) et Aide.
+  - Écrans : Documents (avec un accueil en trois étapes), Recherche, Comparaison, Réglages (essentiel d'abord, réglages avancés repliés) et Aide. Ils restent montés et seul l'écran affiché est visible : une lecture de dossier, une comparaison ou des réglages en cours survivent à un changement d'écran.
   - `preparation.tsx` vérifie, sans appel payant, les services utiles au mode choisi, puis dit quoi faire.
   - `contexte.tsx` porte l'état partagé et la navigation : un lien « Comment faire ? » ouvre l'aide sur la bonne question.
   - Le thème (clair, sombre, système) est imposé par le processus principal via `nativeTheme.themeSource`, que suit la requête CSS `prefers-color-scheme`.

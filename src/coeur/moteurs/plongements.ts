@@ -29,6 +29,8 @@ export interface MoteurPlongement {
   readonly nom: string;
   readonly modele: string;
   readonly horsMachine: boolean;
+  /** Serveur qui calcule les vecteurs : deux serveurs peuvent servir des modèles différents sous le même nom. */
+  readonly origine?: string;
   plonger(textes: TexteAPlonger[], usage: UsagePlongement, options?: OptionsPlongement): Promise<ResultatPlongement>;
 }
 
@@ -69,12 +71,14 @@ export class MoteurPlongementOllama implements MoteurPlongement {
   readonly nom = 'Ollama';
   readonly modele: string;
   readonly horsMachine: boolean;
+  readonly origine: string;
   readonly #options: OptionsOllama;
 
   constructor(options: OptionsOllama) {
     this.#options = options;
     this.modele = options.modele;
     this.horsMachine = !estAdresseLocale(options.url);
+    this.origine = options.url;
   }
 
   async plonger(textes: TexteAPlonger[], usage: UsagePlongement, options: OptionsPlongement = {}): Promise<ResultatPlongement> {

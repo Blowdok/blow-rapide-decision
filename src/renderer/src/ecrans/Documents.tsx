@@ -31,7 +31,7 @@ function AvancementLecture({ progression, annuler }: { progression: Progression 
 }
 
 export function EcranDocuments() {
-  const { etat, corpus, definirCorpus, rafraichirCorpus, progression, allerA } = useApplication();
+  const { etat, corpus, definirCorpus, rafraichirCorpus, progression, allerA, ecran } = useApplication();
   const [operation, definirOperation] = useState<Operation>(null);
   const [erreur, definirErreur] = useState<string | null>(null);
   const [selection, definirSelection] = useState<string | null>(null);
@@ -115,7 +115,7 @@ export function EcranDocuments() {
           <ol className="etapes">
             <li>
               <h3>Vérifiez que l’agent est prêt</h3>
-              <EtatPreparation />
+              <EtatPreparation actif={ecran === 'documents'} />
             </li>
             <li>
               <h3>Choisissez un dossier de documents</h3>
