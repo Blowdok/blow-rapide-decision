@@ -1,6 +1,9 @@
-import { resolve } from 'node:path';
+import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { basename, join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { ServiceAgent } from '../../src/main/service';
+import { CATEGORIE_A_VERIFIER } from '../../src/partage/contrat';
 import type { Progression } from '../../src/partage/contrat';
 import { fusionnerReglages, REGLAGES_PAR_DEFAUT, type Reglages, type Secrets } from '../../src/partage/reglages';
 import { type AppelEnregistre, fauxFetch, reponseJson } from '../outils/faux-fetch';
@@ -59,6 +62,51 @@ describe('service de l’application', () => {
     expect(agent.detail(id).resume?.texte).toContain('180 € HT par mois');
     expect(() => agent.cheminDocument('../secret.txt')).toThrow(/Document introuvable/);
     expect(agent.journal()).toEqual([]);
+  });
+
+  it('copie les décisions validées en dossiers, sans déplacer les originaux', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'brd-sortie-service-'));
+    try {
+      const { agent } = service();
+      const indexe = await agent.indexer(resolve(DEMO, 'documents'));
+      await agent.trier();
+      const documents = agent.etatCorpus()?.documents ?? [];
+      const affectations = documents.map((document) => ({
+        documentId: document.id,
+        categorie: document.triage?.aVerifier ? CATEGORIE_A_VERIFIER : (document.triage?.categorie ?? '')
+      }));
+      const resultat = await agent.copierClassement(parent, affectations);
+      const categories = new Map(REGLAGES_PAR_DEFAUT.classement.categories.map((categorie) => [categorie.id, categorie.libelle]));
+
+      expect(resultat).toEqual({
+        dossierDestination: join(parent, `${basename(indexe.dossier)} - classé`),
+        fichiersCopies: indexe.documents.length
+      });
+      expect(agent.dernierRangement).toBe(resultat.dossierDestination);
+      const bilan = await readFile(join(resultat.dossierDestination, 'Bilan du classement.csv'), 'utf8');
+      expect(bilan).toContain('"Chemin du document";"Catégorie proposée";"Dossier choisi"');
+      expect(bilan).toContain('"Référence sans IA"');
+      for (const document of documents) {
+        const categorie = document.triage?.aVerifier ? 'À vérifier' : categories.get(document.triage?.categorie ?? '');
+        expect(categorie).toBeDefined();
+        await access(join(resultat.dossierDestination, categorie as string, ...document.id.split('/')));
+        await access(document.chemin);
+      }
+    } finally {
+      await rm(parent, { recursive: true, force: true });
+    }
+  });
+
+  it('refuse de copier si le dossier n’a pas été classé avec le mode actif', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'brd-sortie-non-classee-'));
+    try {
+      const { agent } = service();
+      const indexe = await agent.indexer(resolve(DEMO, 'documents'));
+      const affectations = indexe.documents.map((document) => ({ documentId: document.id, categorie: 'facture' }));
+      await expect(agent.copierClassement(parent, affectations)).rejects.toThrow(/Classez d’abord tous les documents/);
+    } finally {
+      await rm(parent, { recursive: true, force: true });
+    }
   });
 
   it('consigne les envois du mode hybride, données personnelles masquées', async () => {

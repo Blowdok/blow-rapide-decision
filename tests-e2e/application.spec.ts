@@ -3,7 +3,7 @@
 // et aide. Sans clé ni serveur Ollama, seul le mode « Référence sans IA » peut
 // aboutir : c'est lui que le parcours utilise.
 
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron, type ElectronApplication, expect, type Page, test } from '@playwright/test';
@@ -41,6 +41,7 @@ async function capturer(nom: string): Promise<void> {
 
 test.beforeAll(async () => {
   donnees = await mkdtemp(join(tmpdir(), 'brd-e2e-'));
+  await writeFile(join(donnees, 'reglages.json'), JSON.stringify({ ollama: { url: 'http://127.0.0.1:9' } }), 'utf8');
   application = await electron.launch({
     // Le bac à sable de Chromium refuse l'utilisateur root (conteneurs d'intégration continue).
     args: [RACINE, ...(process.getuid?.() === 0 ? ['--no-sandbox'] : [])],
@@ -95,6 +96,17 @@ test('indexe la démo, trie et résume en mode référence', async () => {
   await expect(fenetre.getByRole('heading', { name: 'Résumé' })).toBeVisible();
   await expect(fenetre.locator('.texte-resume')).toContainText('180 € HT par mois');
   await expect(fenetre.getByText(/rien n’a quitté ce PC/).first()).toBeVisible();
+
+  await fenetre.getByRole('button', { name: /Préparer une copie rangée/ }).click();
+  const apercu = fenetre.getByRole('region', { name: 'Aperçu du rangement' });
+  await expect(apercu).toBeVisible();
+  await expect(apercu).toContainText('Référence sans IA');
+  await expect(apercu).toContainText('Jev n’est utilisé qu’en mode Hybride');
+  await expect(apercu.getByRole('button', { name: 'Créer la copie rangée' })).toBeDisabled();
+  expect(await elementsSansInfobulle()).toEqual([]);
+  await apercu.getByRole('button', { name: 'Annuler' }).click();
+  await expect(apercu).toHaveCount(0);
+
   await fenetre.locator('.fiche summary').click();
   expect(await elementsSansInfobulle()).toEqual([]);
   await capturer('02-documents');

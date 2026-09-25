@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { DetailDocument, Progression } from '../../../partage/contrat';
+import {
+  CATEGORIE_A_VERIFIER,
+  type AffectationRangement,
+  type DetailDocument,
+  type Progression,
+  type ResultatRangement
+} from '../../../partage/contrat';
 import { formaterEntier, formaterPourcentage } from '../../../partage/format';
 import { api, messageErreur } from '../api';
 import { BarreProgression, BilanMesures, Jauge, Message, MessageErreur, Pastille, Urgence } from '../composants';
 import { useApplication } from '../contexte';
 import { EtatPreparation } from '../preparation';
 
-type Operation = 'lecture' | 'classement' | 'resume' | null;
+type Operation = 'lecture' | 'classement' | 'resume' | 'rangement' | null;
+
+const nomDossier = (chemin: string): string => chemin.split(/[\\/]/).filter(Boolean).at(-1) ?? 'Documents';
 
 const taille = (octets: number): string =>
   octets < 1024 ? `${octets} o` : octets < 1_048_576 ? `${formaterEntier(octets / 1024)} Ko` : `${(octets / 1_048_576).toFixed(1).replace('.', ',')} Mo`;
@@ -38,6 +46,10 @@ export function EcranDocuments() {
   const [detail, definirDetail] = useState<DetailDocument | null>(null);
   const [filtre, definirFiltre] = useState('');
   const [seulementAVerifier, definirSeulementAVerifier] = useState(false);
+  const [apercuRangement, definirApercuRangement] = useState(false);
+  const [parentRangement, definirParentRangement] = useState<string | null>(null);
+  const [affectationsRangement, definirAffectationsRangement] = useState<Record<string, string>>({});
+  const [resultatRangement, definirResultatRangement] = useState<ResultatRangement | null>(null);
 
   const profil = etat?.reglages.profil;
   const categories = useMemo(
@@ -52,7 +64,10 @@ export function EcranDocuments() {
 
   // Les classements et résumés dépendent du mode : on recharge quand il change.
   useEffect(() => {
-    if (profil) void rafraichirCorpus();
+    if (profil) {
+      definirApercuRangement(false);
+      void rafraichirCorpus();
+    }
   }, [profil, rafraichirCorpus]);
 
   useEffect(() => {
@@ -79,6 +94,9 @@ export function EcranDocuments() {
     executer('lecture', async () => {
       const nouveau = await api.dossier.indexer(chemin);
       definirSelection(null);
+      definirApercuRangement(false);
+      definirParentRangement(null);
+      definirResultatRangement(null);
       definirCorpus(nouveau);
     });
   const annulerLecture = () => void api.dossier.annuler();
@@ -88,8 +106,9 @@ export function EcranDocuments() {
     if (chemin) await lireDossier(chemin);
   };
 
-  const classer = (ids?: string[]) =>
-    executer('classement', async () => {
+  const classer = (ids?: string[]) => {
+    definirApercuRangement(false);
+    return executer('classement', async () => {
       try {
         await api.documents.trier(ids);
       } finally {
@@ -97,6 +116,7 @@ export function EcranDocuments() {
         await rafraichirCorpus();
       }
     });
+  };
 
   const resumer = (id: string) =>
     executer('resume', async () => {
@@ -113,6 +133,57 @@ export function EcranDocuments() {
   const visibles = documents.filter(
     (d) => (!filtre || d.triage?.categorie === filtre) && (!seulementAVerifier || d.triage?.aVerifier)
   );
+  const moteurDecision = profil === 'hybride' ? 'Jev via OpenRouter' : profil === 'local' ? 'Ollama en local' : 'Référence sans IA';
+  const nomSortie = `${nomDossier(corpus?.dossier ?? '')} - classé`;
+  const aVerifierDansApercu = documents.filter(
+    (document) => (affectationsRangement[document.id] ?? (document.triage?.aVerifier ? CATEGORIE_A_VERIFIER : document.triage?.categorie)) === CATEGORIE_A_VERIFIER
+  ).length;
+
+  const ouvrirApercuRangement = () => {
+    definirErreur(null);
+    definirParentRangement(null);
+    definirResultatRangement(null);
+    definirAffectationsRangement(
+      Object.fromEntries(
+        documents.map((document) => [
+          document.id,
+          document.triage?.aVerifier ? CATEGORIE_A_VERIFIER : (document.triage?.categorie ?? CATEGORIE_A_VERIFIER)
+        ])
+      )
+    );
+    definirApercuRangement(true);
+  };
+
+  const choisirParentRangement = async () => {
+    definirErreur(null);
+    try {
+      const parent = await api.rangement.choisirDestination();
+      if (parent) definirParentRangement(parent);
+    } catch (e) {
+      definirErreur(messageErreur(e));
+    }
+  };
+
+  const copierRangement = () => {
+    if (!parentRangement) {
+      definirErreur('Choisissez d’abord le dossier où créer la copie rangée.');
+      return;
+    }
+    void executer('rangement', async () => {
+      const affectations: AffectationRangement[] = documents.map((document) => ({
+        documentId: document.id,
+        categorie:
+          affectationsRangement[document.id] ??
+          (document.triage?.aVerifier ? CATEGORIE_A_VERIFIER : (document.triage?.categorie ?? CATEGORIE_A_VERIFIER))
+      }));
+      const resultat = await api.rangement.copier(parentRangement, affectations);
+      definirResultatRangement(resultat);
+      definirApercuRangement(false);
+    });
+  };
+
+  const ouvrirDernierRangement = () =>
+    void api.rangement.ouvrirDernier().catch((e: unknown) => definirErreur(messageErreur(e)));
 
   if (!corpus) {
     return (
@@ -220,6 +291,17 @@ export function EcranDocuments() {
               ? `Classer les ${restants} documents`
               : `Classer les ${restants} restants`}
         </button>
+        {restants === 0 && documents.length > 0 && (
+          <button
+            type="button"
+            className="principal"
+            disabled={operation !== null}
+            onClick={ouvrirApercuRangement}
+            data-infobulle={bulle('Vérifie les dossiers proposés, corrige-les si besoin, puis crée une copie rangée sans toucher aux originaux.')}
+          >
+            Préparer une copie rangée…
+          </button>
+        )}
         <span className="separateur" />
         <label data-infobulle="N’afficher que les documents d’une catégorie.">
           Catégorie{' '}
@@ -237,6 +319,134 @@ export function EcranDocuments() {
           vérifier seulement
         </label>
       </div>
+
+      {apercuRangement && (
+        <section className="bloc apercu-rangement" aria-label="Aperçu du rangement">
+          <div className="rangement-entete">
+            <div>
+              <h2>Vérifier le rangement</h2>
+              <p className="indice">Les propositions viennent de {moteurDecision}. Jev n’est utilisé qu’en mode Hybride.</p>
+            </div>
+            <button type="button" className="lien" disabled={operation !== null} onClick={() => definirApercuRangement(false)} data-infobulle="Ferme l’aperçu sans copier ni modifier les fichiers.">
+              Fermer
+            </button>
+          </div>
+
+          <p>
+            Choisis le dossier où créer « <strong>{nomSortie}</strong> ». Les originaux ne seront ni déplacés ni modifiés.
+            Le rangement porte sur tous les documents lus, même si le tableau principal est filtré.
+          </p>
+          <p className="indice">La copie inclura un bilan CSV avec la catégorie proposée et retenue, l’action, l’urgence, la confiance, le moteur et son coût.</p>
+          {corpus.erreurs.length > 0 && (
+            <p className="indice">Les {corpus.erreurs.length} fichier(s) non lus sont exclus de la copie.</p>
+          )}
+          {aVerifierDansApercu > 0 && (
+            <Message type="alerte">
+              {aVerifierDansApercu} document(s) iront dans « À vérifier » tant que tu ne choisis pas une autre destination.
+            </Message>
+          )}
+
+          <div className="table-defilante rangement-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Document</th>
+                  <th>Dossier d’arrivée</th>
+                  <th>Action détectée</th>
+                  <th>Urgence</th>
+                  <th>Confiance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {documents.map((document) => {
+                  const categorie =
+                    affectationsRangement[document.id] ??
+                    (document.triage?.aVerifier ? CATEGORIE_A_VERIFIER : (document.triage?.categorie ?? CATEGORIE_A_VERIFIER));
+                  return (
+                    <tr key={document.id}>
+                      <td>
+                        <span className="nom-document">{document.nom}</span>
+                        {document.id !== document.nom && <span className="dossier-document">{document.id.slice(0, -document.nom.length)}</span>}
+                      </td>
+                      <td>
+                        <select
+                          aria-label={`Dossier d’arrivée pour ${document.nom}`}
+                          disabled={operation !== null}
+                          value={categorie}
+                          data-infobulle="Choisis le sous-dossier de destination; les cas incertains restent dans « À vérifier » par défaut."
+                          onChange={(evenement) => {
+                            definirErreur(null);
+                            definirAffectationsRangement((actuelles) => ({ ...actuelles, [document.id]: evenement.target.value }));
+                          }}
+                        >
+                          <option value={CATEGORIE_A_VERIFIER}>À vérifier</option>
+                          {[...categories].map(([id, libelle]) => (
+                            <option key={id} value={id}>
+                              {libelle}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>{document.triage?.actionRequise ? 'Oui' : 'Non détectée'}</td>
+                      <td>{document.triage ? <Urgence note={document.triage.urgence} /> : '–'}</td>
+                      <td>{document.triage ? formaterPourcentage(document.triage.confiance) : '–'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="rangement-emplacement">
+            {parentRangement ? (
+              <>
+                Nouveau dossier : <strong>{nomSortie}</strong> dans <span>{parentRangement}</span>
+              </>
+            ) : (
+              'Aucun emplacement choisi.'
+            )}
+          </p>
+          <div className="actions">
+            <button
+              type="button"
+              disabled={operation !== null}
+              onClick={() => void choisirParentRangement()}
+              data-infobulle="Choisis le dossier parent; l’application y créera un nouveau dossier de copie."
+            >
+              {parentRangement ? 'Changer l’emplacement…' : 'Choisir l’emplacement…'}
+            </button>
+            <button
+              type="button"
+              className="principal"
+              disabled={operation !== null || !parentRangement}
+              onClick={copierRangement}
+              data-infobulle="Crée une nouvelle copie dans les sous-dossiers choisis; ne déplace et ne remplace aucun original."
+            >
+              {operation === 'rangement' ? 'Copie en cours…' : 'Créer la copie rangée'}
+            </button>
+            <button
+              type="button"
+              disabled={operation !== null}
+              onClick={() => definirApercuRangement(false)}
+              data-infobulle="Ferme l’aperçu; aucun fichier ne sera copié ni modifié."
+            >
+              Annuler
+            </button>
+          </div>
+        </section>
+      )}
+
+      {resultatRangement && (
+        <div className="message message-succes rangement-resultat" role="status">
+          <div>
+            <strong>Copie rangée créée.</strong> {formaterEntier(resultatRangement.fichiersCopies)} document(s) copiés; les originaux sont restés intacts.
+            <p>{resultatRangement.dossierDestination}</p>
+          </div>
+          <button type="button" onClick={ouvrirDernierRangement} data-infobulle="Ouvre le dossier créé dans le gestionnaire de fichiers.">
+            Ouvrir le dossier rangé
+          </button>
+        </div>
+      )}
 
       {operation === null && documents.length > 0 && restants === documents.length && (
         <p className="indice etape-suivante">
