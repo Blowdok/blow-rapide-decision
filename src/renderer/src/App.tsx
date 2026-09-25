@@ -3,19 +3,19 @@ import { PROFILS, type Theme, THEMES } from '../../partage/reglages';
 import type { IdProfil } from '../../partage/types';
 import { messageErreur } from './api';
 import { Message } from './composants';
-import { useApplication } from './contexte';
+import { type Ecran, useApplication } from './contexte';
+import { EcranAide } from './ecrans/Aide';
 import { EcranComparaison } from './ecrans/Comparaison';
 import { EcranDocuments } from './ecrans/Documents';
 import { EcranRecherche } from './ecrans/Recherche';
 import { EcranReglages } from './ecrans/Reglages';
 
-type Onglet = 'documents' | 'recherche' | 'comparaison' | 'reglages';
-
-const ONGLETS: Array<{ id: Onglet; libelle: string; aide: string }> = [
-  { id: 'documents', libelle: 'Documents', aide: 'Indexer, trier et résumer' },
-  { id: 'recherche', libelle: 'Recherche', aide: 'Trouver le bon passage' },
-  { id: 'comparaison', libelle: 'Comparaison', aide: 'Local ou hybride ?' },
-  { id: 'reglages', libelle: 'Réglages', aide: 'Modèles, clés, catégories' }
+const ONGLETS: Array<{ id: Ecran; libelle: string; aide: string }> = [
+  { id: 'documents', libelle: 'Documents', aide: 'Classer et résumer vos fichiers' },
+  { id: 'recherche', libelle: 'Recherche', aide: 'Poser une question' },
+  { id: 'comparaison', libelle: 'Comparaison', aide: 'Choisir entre local et hybride' },
+  { id: 'reglages', libelle: 'Réglages', aide: 'Clés, options, préférences' },
+  { id: 'aide', libelle: 'Aide', aide: 'Premiers pas et questions' }
 ];
 
 /** Où vont les données dans le mode choisi. */
@@ -33,7 +33,7 @@ function Confidentialite() {
 }
 
 function SelecteurMode() {
-  const { etat, enregistrerReglages } = useApplication();
+  const { etat, enregistrerReglages, allerA } = useApplication();
   const [erreur, definirErreur] = useState<string | null>(null);
   if (!etat) return null;
   const changer = async (profil: IdProfil) => {
@@ -62,6 +62,9 @@ function SelecteurMode() {
         ))}
       </div>
       <Confidentialite />
+      <button type="button" className="lien" onClick={() => allerA('aide', 'modes')}>
+        Quel mode choisir ?
+      </button>
       {erreur && <Message type="erreur">{erreur}</Message>}
     </div>
   );
@@ -96,8 +99,7 @@ function SelecteurTheme() {
 }
 
 export function App() {
-  const [onglet, definirOnglet] = useState<Onglet>('documents');
-  const { erreurDemarrage } = useApplication();
+  const { erreurDemarrage, ecran, allerA } = useApplication();
   return (
     <div className="application">
       <aside className="barre-laterale">
@@ -110,9 +112,9 @@ export function App() {
             <button
               key={o.id}
               type="button"
-              className={onglet === o.id ? 'onglet actif' : 'onglet'}
-              aria-current={onglet === o.id ? 'page' : undefined}
-              onClick={() => definirOnglet(o.id)}
+              className={ecran === o.id ? 'onglet actif' : 'onglet'}
+              aria-current={ecran === o.id ? 'page' : undefined}
+              onClick={() => allerA(o.id)}
             >
               <span className="onglet-libelle">{o.libelle}</span>
               <span className="onglet-aide">{o.aide}</span>
@@ -127,10 +129,11 @@ export function App() {
         </header>
         <main className="contenu">
           {erreurDemarrage && <Message type="erreur">{erreurDemarrage}</Message>}
-          {onglet === 'documents' && <EcranDocuments />}
-          {onglet === 'recherche' && <EcranRecherche />}
-          {onglet === 'comparaison' && <EcranComparaison />}
-          {onglet === 'reglages' && <EcranReglages />}
+          {ecran === 'documents' && <EcranDocuments />}
+          {ecran === 'recherche' && <EcranRecherche />}
+          {ecran === 'comparaison' && <EcranComparaison />}
+          {ecran === 'reglages' && <EcranReglages />}
+          {ecran === 'aide' && <EcranAide />}
         </main>
       </div>
     </div>

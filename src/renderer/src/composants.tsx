@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { formaterDuree, formaterEntier, formaterPourcentage, formaterUsd } from '../../partage/format';
 import type { Mesure } from '../../partage/types';
+import { useApplication } from './contexte';
 
 export function BarreProgression({ fait, total, libelle }: { fait: number; total: number; libelle: string }) {
   return (
@@ -40,11 +41,37 @@ export function Message({ type, children }: { type: 'erreur' | 'info' | 'succes'
   );
 }
 
+/** Sujet de l'aide qui explique comment réparer une erreur, s'il y en a un. */
+function sujetDeLErreur(message: string): string | null {
+  if (/ollama/i.test(message)) return 'ollama';
+  if (/openrouter|typesafe|clé|crédit/i.test(message)) return 'openrouter';
+  return null;
+}
+
+/** Message d'erreur suivi, quand c'est utile, d'un lien vers l'aide qui explique quoi faire. */
+export function MessageErreur({ message }: { message: string }) {
+  const { allerA } = useApplication();
+  const sujet = sujetDeLErreur(message);
+  return (
+    <Message type="erreur">
+      {message}
+      {sujet && (
+        <>
+          {' '}
+          <button type="button" className="lien" onClick={() => allerA('aide', sujet)}>
+            Comment faire ?
+          </button>
+        </>
+      )}
+    </Message>
+  );
+}
+
 export function Pastille({ ton, children }: { ton: 'neutre' | 'accent' | 'succes' | 'alerte' | 'danger'; children: ReactNode }) {
   return <span className={`pastille pastille-${ton}`}>{children}</span>;
 }
 
-/** Bilan d'une opération : temps, coût, données envoyées hors de la machine. */
+/** Bilan d'une opération, en clair : qui l'a faite, en combien de temps, pour quel coût, et ce qui a quitté le PC. */
 export function BilanMesures({ mesures }: { mesures: Mesure[] }) {
   const duree = mesures.reduce((s, m) => s + m.dureeMs, 0);
   const cout = mesures.reduce((s, m) => s + m.coutUsd, 0);
@@ -54,10 +81,10 @@ export function BilanMesures({ mesures }: { mesures: Mesure[] }) {
   const moteurs = [...new Set(mesures.map((m) => `${m.moteur} (${m.modele})`))].join(', ');
   return (
     <p className="bilan">
-      {moteurs} · {formaterDuree(duree)} · {formaterUsd(cout)} ·{' '}
+      Fait par {moteurs} en {formaterDuree(duree)} · {cout > 0 ? `coût ${formaterUsd(cout)}` : 'gratuit'} ·{' '}
       {distantes.length
-        ? `${formaterEntier(envoyes)} caractères envoyés hors de la machine, ${formaterEntier(masques)} données masquées`
-        : 'rien n’a quitté la machine'}
+        ? `${formaterEntier(envoyes)} caractères envoyés sur Internet, ${formaterEntier(masques)} données personnelles masquées`
+        : 'rien n’a quitté ce PC'}
     </p>
   );
 }

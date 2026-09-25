@@ -19,7 +19,12 @@ Mise à jour : 25 septembre 2026. À lire au début de chaque session, à mettre
   - lecture des PDF scannés avec `minicpm-v4.6:1b`.
 
   Sans leurs modèles, l'agent fonctionne comme avant ; un échec laisse un avis. L'indexation peut maintenant être annulée.
-- Vérifications : typage, 154 tests unitaires, les 7 étapes du parcours de bout en bout de l'application et les 4 étapes du parcours des options (face à un faux serveur Ollama) passent.
+- 25 septembre 2026, à la demande de Blowdok (« L'interface doit être intuitive pour qu'un débutant novice puisse utiliser »), l'interface s'adresse à un débutant ([RAD 0006](decisions/0006-interface-pour-debutant.md)) :
+  - un accueil en trois étapes vérifie que l'agent est prêt ;
+  - un écran Aide répond aux questions courantes ;
+  - le vocabulaire est simplifié (« Classer », « Actualiser ») et les réglages techniques sont repliés.
+- Vérifications : typage, 154 tests unitaires, les 8 étapes du parcours de bout en bout de l'application et les 4 étapes du parcours des options (face à un faux serveur Ollama) passent.
+- Blowdok a demandé la fusion dans `main` une fois ce travail terminé (PR #1).
 - Aucun essai réel avec Ollama, OpenRouter ou Jev : l'environnement de construction n'avait ni serveur Ollama ni clé API. Seuls le mode référence et des réponses simulées au format documenté ont tourné.
 
 ## Prochaine action
@@ -29,8 +34,9 @@ Mise à jour : 25 septembre 2026. À lire au début de chaque session, à mettre
 3. Comparer les autres petits modèles locaux (`gemma3:4b`, `granite4.2:3b`, `gemma4:e2b`) en changeant le modèle dans Réglages puis en relançant la comparaison.
 4. Constituer un jeu d'évaluation de 20 à 50 vrais documents représentatifs, puis trancher local ou hybride avec le banc.
 5. Valider la tolérance de 5 points et les critères du banc ([RAD 0004](decisions/0004-banc-de-decision.md)).
-6. Essayer les options sur le PC de Blowdok ([RAD 0005](decisions/0005-options-semantique-et-ocr.md)) :
-   - cocher la recherche sémantique, réindexer, relancer la Comparaison et lire la ligne « Lexical et sémantique » du rapport ;
+6. Faire suivre l'accueil en trois étapes à un vrai débutant, sans aide, et noter où il bloque ([RAD 0006](decisions/0006-interface-pour-debutant.md)).
+7. Essayer les options sur le PC de Blowdok ([RAD 0005](decisions/0005-options-semantique-et-ocr.md)) :
+   - cocher la recherche par le sens, « Actualiser » le dossier, relancer la Comparaison et lire la ligne « Lexical et sémantique » du rapport ;
    - comparer `embeddinggemma` et `nomic-embed-text-v2-moe` ;
    - lire quelques vrais PDF scannés avec `minicpm-v4.6:1b` et juger la transcription en français.
 
@@ -41,3 +47,4 @@ Mise à jour : 25 septembre 2026. À lire au début de chaque session, à mettre
 - [RAD 0003 — Jev décide, un LLM rédige : modes local et hybride](decisions/0003-jev-decide-un-llm-redige.md).
 - [RAD 0004 — Un banc de décision tranche entre local et hybride](decisions/0004-banc-de-decision.md).
 - [RAD 0005 — Recherche sémantique et lecture des PDF scannés, en options locales](decisions/0005-options-semantique-et-ocr.md).
+- [RAD 0006 — L'interface s'adresse à un débutant](decisions/0006-interface-pour-debutant.md).

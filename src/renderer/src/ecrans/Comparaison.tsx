@@ -174,22 +174,27 @@ export function EcranComparaison() {
   return (
     <section className="ecran">
       <h1>Comparaison des modes</h1>
+      <p className="consigne">
+        Vous hésitez entre Local et Hybride ? La comparaison fait passer le même examen à chaque mode, sur des documents
+        d’exemple dont on connaît les bonnes réponses. Elle mesure la justesse, le temps, le coût et ce qui part sur Internet,
+        puis recommande un mode. Comptez quelques minutes.
+      </p>
       <p className="indice">
-        Le banc fait passer le même jeu d’évaluation à chaque mode (mêmes documents, mêmes questions) et mesure qualité, temps,
-        coût et données envoyées hors de la machine. Le mode local est recommandé tant que l’hybride ne le dépasse pas de plus
-        que la tolérance du jeu.
+        Le mode Local demande Ollama, le mode Hybride une clé OpenRouter : un mode qui n’est pas prêt est simplement signalé.
+        Le mode Local reste recommandé tant que l’Hybride ne fait pas nettement mieux.
       </p>
 
       <div className="formulaire">
         <label className="champ">
-          <span>Jeu d’évaluation</span>
+          <span>Documents d’examen</span>
           <span className="ligne">
-            <input type="text" value={jeu} onChange={(e) => definirJeu(e.target.value)} aria-label="Dossier du jeu d’évaluation" />
+            <input type="text" value={jeu} onChange={(e) => definirJeu(e.target.value)} aria-label="Dossier des documents d’examen" />
             <button type="button" onClick={() => void choisirJeu()} disabled={enCours}>
               Choisir…
             </button>
           </span>
         </label>
+        <p className="indice">Par défaut, le jeu de démonstration fourni : 12 documents fictifs d’une petite agence web.</p>
         <fieldset className="champ">
           <legend>Modes à comparer</legend>
           {(Object.keys(PROFILS) as IdProfil[]).map((id) => (

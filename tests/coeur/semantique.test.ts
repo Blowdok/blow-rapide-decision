@@ -164,10 +164,10 @@ describe('recherche sémantique (option)', () => {
     expect(trouves.candidats.map((c) => c.rangSemantique)).toEqual([null]);
   });
 
-  it('demande de réindexer quand l’option est activée après l’indexation', async () => {
+  it('demande d’actualiser le dossier quand l’option est activée après sa lecture', async () => {
     const corpus = await indexerDossier(dossier);
     const trouves = await trouverCandidats(corpus, 'taxe foncière', 5, avecOption);
-    expect(trouves.avis).toBe('Recherche sémantique activée après l’indexation : réindexez le dossier pour l’appliquer.');
+    expect(trouves.avis).toBe('Recherche sémantique activée après la lecture du dossier : actualisez le dossier pour l’appliquer.');
     expect(trouves.candidats[0]?.passage.documentId).toBe('avis-fonciere.txt');
   });
 
@@ -183,7 +183,7 @@ describe('recherche sémantique (option)', () => {
     ]);
     const trouves = await trouverCandidats(corpus, 'taxe foncière', 5, avecOption);
     expect(trouves.candidats[0]?.passage.documentId).toBe('avis-fonciere.txt');
-    expect(trouves.avis).toMatch(/^Recherche sémantique indisponible : .* Réindexez le dossier une fois le problème réglé\.$/);
+    expect(trouves.avis).toMatch(/^Recherche sémantique indisponible : .* Actualisez le dossier une fois le problème réglé\.$/);
   });
 
   it('se replie sur les mots-clés si la requête ne peut pas être plongée', async () => {
@@ -205,7 +205,7 @@ describe('recherche sémantique (option)', () => {
     const meme = await trouverCandidats(corpus, 'paie', 5, { semantique: true, modele: 'embeddinggemma:latest' });
     expect(meme.avis).toBeUndefined();
     const autre = await trouverCandidats(corpus, 'paie', 5, { semantique: true, modele: 'nomic-embed-text-v2-moe' });
-    expect(autre.avis).toBe('Index sémantique calculé avec embeddinggemma : réindexez le dossier pour passer à nomic-embed-text-v2-moe.');
+    expect(autre.avis).toBe('Recherche sémantique préparée avec embeddinggemma : actualisez le dossier pour passer à nomic-embed-text-v2-moe.');
     expect(autre.modelePlongement).toBe('embeddinggemma');
   });
 

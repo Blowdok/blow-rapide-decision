@@ -314,9 +314,9 @@ export async function trouverCandidats(
 
   const semantique = corpus.semantique;
   if (!options.semantique) return seulementLexical();
-  if (!semantique) return seulementLexical('Recherche sémantique activée après l’indexation : réindexez le dossier pour l’appliquer.');
+  if (!semantique) return seulementLexical('Recherche sémantique activée après la lecture du dossier : actualisez le dossier pour l’appliquer.');
   if (semantique.etat === 'echec') {
-    return seulementLexical(`Recherche sémantique indisponible : ${finPhrase(semantique.message)} Réindexez le dossier une fois le problème réglé.`);
+    return seulementLexical(`Recherche sémantique indisponible : ${finPhrase(semantique.message)} Actualisez le dossier une fois le problème réglé.`);
   }
 
   let plongement: ResultatPlongement;
@@ -342,7 +342,7 @@ export async function trouverCandidats(
     }));
   const avis =
     options.modele && !memeModele(options.modele, semantique.modele)
-      ? `Index sémantique calculé avec ${semantique.modele} : réindexez le dossier pour passer à ${options.modele}.`
+      ? `Recherche sémantique préparée avec ${semantique.modele} : actualisez le dossier pour passer à ${options.modele}.`
       : undefined;
   return { candidats, modelePlongement: semantique.modele, ...(avis ? { avis } : {}), mesures: [plongement.mesure] };
 }

@@ -29,7 +29,7 @@ function service(options: { reglages?: Partial<Reglages>; secrets?: Secrets; fet
 describe('service de l’application', () => {
   it('exige un dossier indexé avant de chercher', async () => {
     const { agent } = service();
-    await expect(agent.rechercher('facture')).rejects.toThrow("Aucun dossier indexé : choisissez d’abord un dossier.");
+    await expect(agent.rechercher('facture')).rejects.toThrow('Aucun dossier ouvert : choisissez d’abord un dossier dans l’écran Documents.');
     expect(agent.etatCorpus()).toBeNull();
   });
 
@@ -57,7 +57,7 @@ describe('service de l’application', () => {
     expect(agent.detail(id)).toMatchObject({ id, resume: null, apercu: expect.stringContaining('CONTRAT DE MAINTENANCE') });
     await agent.resumer(id);
     expect(agent.detail(id).resume?.texte).toContain('180 € HT par mois');
-    expect(() => agent.cheminDocument('../secret.txt')).toThrow(/Document inconnu/);
+    expect(() => agent.cheminDocument('../secret.txt')).toThrow(/Document introuvable/);
     expect(agent.journal()).toEqual([]);
   });
 
@@ -127,7 +127,7 @@ describe('options facultatives dans le service', () => {
     expect(etat.avis).toEqual([expect.stringMatching(/^Recherche sémantique indisponible : Ollama est injoignable/)]);
     const recherche = await agent.rechercher('taxe foncière');
     expect(recherche.resultats.length).toBeGreaterThan(0);
-    expect(recherche.avis).toMatch(/Réindexez le dossier une fois le problème réglé/);
+    expect(recherche.avis).toMatch(/Actualisez le dossier une fois le problème réglé/);
   });
 
   it('consigne les plongements envoyés à un Ollama distant', async () => {
@@ -151,10 +151,10 @@ describe('options facultatives dans le service', () => {
 
     changer({ semantique });
     const indexation = agent.indexer(resolve(DEMO, 'documents'));
-    await expect(agent.indexer(resolve(DEMO, 'documents'))).rejects.toThrow('Une indexation est déjà en cours.');
+    await expect(agent.indexer(resolve(DEMO, 'documents'))).rejects.toThrow('Le dossier est déjà en cours de lecture.');
     await vi.waitFor(() => expect(progressions.some((p) => p.type === 'indexation' && p.etape === 'plongements')).toBe(true));
     agent.annulerIndexation();
-    await expect(indexation).rejects.toThrow('Indexation annulée.');
+    await expect(indexation).rejects.toThrow('Lecture du dossier annulée.');
     expect(agent.etatCorpus()).toMatchObject({ semantique: null, avis: [] });
     expect(agent.etatCorpus()?.documents).toHaveLength(12);
   });
