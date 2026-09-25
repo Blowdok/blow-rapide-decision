@@ -102,6 +102,31 @@ test('vérifie les services depuis les réglages', async () => {
   await capturer('05-reglages');
 });
 
+test('garde les options facultatives désactivées, et avance sans leurs modèles', async () => {
+  const options = fenetre.getByRole('region', { name: 'Options locales facultatives' });
+  const semantique = options.getByRole('checkbox', { name: /Recherche sémantique/ });
+  await expect(semantique).not.toBeChecked();
+  await expect(options.getByRole('checkbox', { name: /Lecture des PDF scannés/ })).not.toBeChecked();
+
+  // Option activée, mais Ollama injoignable : l'indexation aboutit quand même, avec un avis.
+  await semantique.check();
+  await fenetre.getByRole('textbox', { name: 'Adresse du serveur' }).fill('http://127.0.0.1:9');
+  await fenetre.locator('.titre-ecran').getByRole('button', { name: 'Enregistrer' }).click();
+  await expect(fenetre.getByText('Réglages enregistrés.')).toBeVisible();
+  await capturer('06-options');
+
+  await fenetre.getByRole('button', { name: /^Documents/ }).click();
+  await fenetre.getByRole('button', { name: 'Réindexer' }).click();
+  await expect(fenetre.getByText(/^Recherche sémantique indisponible : Ollama est injoignable/)).toBeVisible();
+  await expect(fenetre.getByRole('row', { name: /facture-imprimerie-lumen\.txt/ })).toBeVisible();
+
+  await fenetre.getByRole('button', { name: /^Recherche/ }).click();
+  await fenetre.getByRole('searchbox', { name: 'Requête' }).fill('date limite pour payer la taxe foncière');
+  await fenetre.getByRole('button', { name: 'Chercher' }).click();
+  await expect(fenetre.locator('.resultat').first()).toContainText('avis-taxe-fonciere-2026.txt');
+  await expect(fenetre.getByText(/Réindexez le dossier une fois le problème réglé/)).toBeVisible();
+});
+
 test('bascule le thème : sombre, clair, puis système', async () => {
   const sombre = () =>
     fenetre.evaluate(
@@ -119,9 +144,9 @@ test('bascule le thème : sombre, clair, puis système', async () => {
   await expect(theme.getByRole('radio', { name: 'Sombre' })).toHaveAttribute('aria-checked', 'true');
   await expect.poll(sombre).toBe(true);
   expect(await themeEnregistre()).toBe('sombre');
-  await capturer('06-documents-sombre');
+  await capturer('07-documents-sombre');
   await fenetre.getByRole('button', { name: /^Comparaison/ }).click();
-  await capturer('07-comparaison-sombre');
+  await capturer('08-comparaison-sombre');
 
   await theme.getByRole('radio', { name: 'Clair' }).click();
   await expect.poll(sombre).toBe(false);

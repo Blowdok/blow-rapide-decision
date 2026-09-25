@@ -1,8 +1,15 @@
 // Mise en forme de la synthèse du banc, commune au rapport Markdown et à
 // l'écran de comparaison. Sans dépendance à Node.
 
-import { LIBELLES_STATUT, type MetriquesProfil, type ResultatBanc, type ResultatClassement, type ResultatProfil } from './banc';
-import { formaterDuree, formaterEntier, formaterNombre, formaterPourcentage, formaterUsd, TIRET } from './format';
+import {
+  LIBELLES_STATUT,
+  type MetriquesProfil,
+  type ResultatBanc,
+  type ResultatClassement,
+  type ResultatProfil,
+  type ResultatRechercheBanc
+} from './banc';
+import { finPhrase, formaterDuree, formaterEntier, formaterNombre, formaterPourcentage, formaterUsd, TIRET } from './format';
 
 export interface LigneSynthese {
   libelle: string;
@@ -66,14 +73,41 @@ export function lignesSynthese(profils: readonly ResultatProfil[]): LigneSynthes
   }));
 }
 
+/** Performance d'un classement sans décision ; une erreur compte comme un document absent. */
+export function syntheseClassement(recherches: readonly ResultatRechercheBanc[]): { enTete: number | null; mrr: number | null } {
+  if (!recherches.length) return { enTete: null, mrr: null };
+  return {
+    enTete: recherches.filter((r) => r.rangPertinent === 1).length / recherches.length,
+    mrr: recherches.reduce((s, r) => s + (r.rangPertinent ? 1 / r.rangPertinent : 0), 0) / recherches.length
+  };
+}
+
 /** Performance de la recherche lexicale seule, commune à tous les modes. */
 export function syntheseRechercheLexicale(resultat: ResultatBanc): { enTete: number | null; mrr: number | null } {
-  const lexicale = resultat.rechercheLexicale;
-  if (!lexicale.length) return { enTete: null, mrr: null };
-  return {
-    enTete: lexicale.filter((r) => r.rangPertinent === 1).length / lexicale.length,
-    mrr: lexicale.reduce((s, r) => s + (r.rangPertinent ? 1 / r.rangPertinent : 0), 0) / lexicale.length
-  };
+  return syntheseClassement(resultat.rechercheLexicale);
+}
+
+/**
+ * Phrases sur les classements sans décision, communes à tous les modes :
+ * BM25 seul, et BM25 fusionné avec la recherche sémantique quand l'option est active.
+ */
+export function phrasesSansDecision(resultat: ResultatBanc): string[] {
+  const performance = (s: { enTete: number | null; mrr: number | null }): string =>
+    `pertinent en tête ${formaterPourcentage(s.enTete)}, rang réciproque moyen ${formaterNombre(s.mrr, 2)}`;
+  const phrases = [`Recherche lexicale seule (BM25), sans décision : ${performance(syntheseRechercheLexicale(resultat))}.`];
+  const { semantique } = resultat;
+  if (semantique?.modele) {
+    phrases.push(
+      `Recherche lexicale et sémantique fusionnées (${semantique.modele}), sans décision : ${performance(syntheseClassement(semantique.recherche))}. ` +
+        'Les modes ont jugé ces passages fusionnés.'
+    );
+  } else if (semantique) {
+    phrases.push(
+      `Recherche sémantique demandée mais indisponible : ${finPhrase(semantique.avis ?? 'raison inconnue')} ` +
+        'Les modes ont jugé les passages de la seule recherche lexicale.'
+    );
+  }
+  return phrases;
 }
 
 const marque = (juste: boolean | undefined): string => (juste === undefined ? '' : juste ? ' ✓' : ' ✗');

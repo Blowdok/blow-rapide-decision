@@ -11,11 +11,19 @@ import { chargerJeu, problemesDuJeu } from '../coeur/banc/jeu';
 import { nomDuRapport, rapportMarkdown } from '../coeur/banc/rapport';
 import { chargerFichierEnv, configurationDepuisEnvironnement } from '../coeur/configuration';
 import { diagnostiquer } from '../coeur/diagnostic';
-import { extraireTexte, formatDepuisChemin } from '../coeur/extraction/extraction';
-import { indexerDossier, passagesDuDocument } from '../coeur/index/corpus';
+import { extraireDocument, formatDepuisChemin } from '../coeur/extraction/extraction';
+import {
+  type Corpus,
+  indexerDossier,
+  type ProgressionIndexation,
+  passagesDuDocument,
+  raisonSansTexte
+} from '../coeur/index/corpus';
+import { optionsFacultatives } from '../coeur/options';
+import { CacheMemoire } from '../coeur/outils/cache';
 import { LIBELLES_STATUT, type ProgressionBanc } from '../partage/banc';
-import { formaterDuree, formaterNombre, formaterPourcentage, formaterUsd } from '../partage/format';
-import { IDS_PROFILS, PROFILS } from '../partage/reglages';
+import { finPhrase, formaterDuree, formaterNombre, formaterPourcentage, formaterUsd } from '../partage/format';
+import { IDS_PROFILS, PROFILS, type Reglages } from '../partage/reglages';
 import type { DocumentIndexe, IdProfil, Mesure } from '../partage/types';
 
 const AIDE = `brd : agent de bureau Blow Rapide Décision
@@ -29,6 +37,7 @@ Commandes :
   diagnostic                                 État d’Ollama, d’OpenRouter et de Jev.
 
 Modes : local (Ollama), hybride (Jev + OpenRouter), reference (sans IA).
+Options facultatives : recherche sémantique (BRD_SEMANTIQUE=1) et lecture des PDF scannés (BRD_OCR=1).
 Configuration : variables d’environnement ou fichier .env (voir .env.exemple).`;
 
 const ETAPES: Record<ProgressionBanc['etape'], string> = {
@@ -45,6 +54,35 @@ function lireProfil(valeur: string | undefined, parDefaut: IdProfil): IdProfil {
   return valeur as IdProfil;
 }
 
+const interactif = process.stdout.isTTY;
+
+/** Pages déjà lues par OCR pendant ce lancement. */
+const cacheOcr = new CacheMemoire();
+
+/** Ligne d'avancement de l'indexation, utile pendant la lecture OCR et les plongements (options). */
+function afficherIndexation({ etape, traites, total, fichier, ocr }: ProgressionIndexation): void {
+  if (!interactif) return;
+  const ligne =
+    etape === 'plongements'
+      ? `Recherche sémantique : ${traites}/${total} passages`
+      : ocr
+        ? `Lecture OCR de ${fichier} : page ${ocr.page}/${ocr.pages}`
+        : `Indexation ${traites}/${total}`;
+  process.stdout.write(`\r${ligne.slice(0, 78).padEnd(78)}`);
+}
+
+/** Indexe un dossier avec les options actives, puis affiche les fichiers non lus et les avis. */
+async function indexer(dossier: string, reglages: Reglages, signalerErreurs = true): Promise<Corpus> {
+  const corpus = await indexerDossier(dossier, {
+    ...optionsFacultatives(reglages, { cacheOcr }),
+    surProgression: afficherIndexation
+  });
+  if (interactif) process.stdout.write(`\r${''.padEnd(78)}\r`);
+  if (signalerErreurs) for (const erreur of corpus.erreurs) console.log(`! ${erreur.chemin} : ${erreur.message}`);
+  for (const avis of corpus.avis) console.log(`! ${avis}`);
+  return corpus;
+}
+
 function bilan(mesures: Mesure[]): string {
   const duree = mesures.reduce((s, m) => s + m.dureeMs, 0);
   const cout = mesures.reduce((s, m) => s + m.coutUsd, 0);
@@ -57,11 +95,10 @@ async function commandeComparer(options: { jeu?: string; profils?: string; sorti
   const profils = (options.profils ?? IDS_PROFILS.join(',')).split(',').map((p) => lireProfil(p.trim(), 'local'));
   const jeu = await chargerJeu(resolve(options.jeu ?? 'jeux-evaluation/demo'));
   console.log(`Jeu « ${jeu.nom} » : indexation de ${jeu.dossierDocuments}…`);
-  const corpus = await indexerDossier(jeu.dossierDocuments);
+  const corpus = await indexer(jeu.dossierDocuments, reglages, false);
   const problemes = problemesDuJeu(jeu, corpus, reglages.classement.categories);
   if (problemes.length) throw new Error(`Jeu incohérent :\n- ${problemes.join('\n- ')}`);
 
-  const interactif = process.stdout.isTTY;
   const resultat = await executerBanc(jeu, corpus, {
     reglages,
     profils,
@@ -94,8 +131,7 @@ async function commandeComparer(options: { jeu?: string; profils?: string; sorti
 async function commandeTrier(dossier: string, profilId: IdProfil): Promise<void> {
   const { reglages, secrets } = configurationDepuisEnvironnement();
   const profil = creerProfil(profilId, { reglages, secrets });
-  const corpus = await indexerDossier(resolve(dossier));
-  for (const erreur of corpus.erreurs) console.log(`! ${erreur.chemin} : ${erreur.message}`);
+  const corpus = await indexer(resolve(dossier), reglages);
   const mesures: Mesure[] = [];
   for (const document of corpus.documents) {
     const t = await trierDocument(document, profil, reglages);
@@ -110,12 +146,17 @@ async function commandeTrier(dossier: string, profilId: IdProfil): Promise<void>
 async function commandeChercher(dossier: string, requete: string, profilId: IdProfil): Promise<void> {
   const { reglages, secrets } = configurationDepuisEnvironnement();
   const profil = creerProfil(profilId, { reglages, secrets });
-  const corpus = await indexerDossier(resolve(dossier));
+  const corpus = await indexer(resolve(dossier), reglages);
   const recherche = await rechercher(corpus, requete, profil, reglages);
+  // Un échec de la recherche sémantique à l'indexation a déjà été signalé.
+  if (recherche.avis && corpus.semantique?.etat !== 'echec') console.log(`! ${recherche.avis}`);
   if (!recherche.resultats.length) console.log('Aucun passage ne correspond.');
   recherche.resultats.forEach((r, i) => {
     const extrait = r.passage.texte.replace(/\s+/g, ' ').slice(0, 160);
-    console.log(`${i + 1}. ${r.documentNom} · pertinence ${formaterPourcentage(r.pertinence)}\n   ${extrait}…`);
+    const rangs = recherche.modelePlongement
+      ? ` · rang lexical ${r.rangLexical ?? '–'}, rang sémantique ${r.rangSemantique ?? '–'}`
+      : '';
+    console.log(`${i + 1}. ${r.documentNom} · pertinence ${formaterPourcentage(r.pertinence)}${rangs}\n   ${extrait}…`);
   });
   console.log(`\n${bilan(recherche.mesures)}.`);
 }
@@ -126,7 +167,12 @@ async function commandeResumer(fichier: string, profilId: IdProfil): Promise<voi
   const chemin = resolve(fichier);
   const format = formatDepuisChemin(chemin);
   if (!format) throw new Error('Format non pris en charge : txt, md, pdf ou docx attendu.');
-  const texte = await extraireTexte(chemin, format);
+  const ocr = optionsFacultatives(reglages, { cacheOcr }).ocr;
+  const extraction = await extraireDocument(chemin, format, ocr ? { ocr } : {});
+  const { texte } = extraction;
+  if (!texte) throw new Error(raisonSansTexte(format, extraction, Boolean(ocr), extraction.erreurOcr ?? null));
+  if (extraction.erreurOcr) console.log(`! Pages scannées non lues : ${finPhrase(extraction.erreurOcr)}`);
+  if (extraction.pagesAuDela) console.log(`! ${extraction.pagesAuDela} page(s) scannée(s) non lue(s), au-delà de la limite.`);
   const infos = await stat(chemin);
   const document: DocumentIndexe = {
     id: basename(chemin),
@@ -136,10 +182,11 @@ async function commandeResumer(fichier: string, profilId: IdProfil): Promise<voi
     taille: infos.size,
     modifieLe: infos.mtime.toISOString(),
     texte,
-    passages: passagesDuDocument(basename(chemin), texte)
+    passages: passagesDuDocument(basename(chemin), texte),
+    ...(extraction.pagesOcr ? { pagesOcr: extraction.pagesOcr } : {})
   };
   const resume = await resumerDocument(document, profil, reglages);
-  console.log(`${resume.texte}\n\n${bilan(resume.mesures)}.`);
+  console.log(`${resume.texte}\n\n${bilan([...extraction.mesures, ...resume.mesures])}.`);
 }
 
 async function commandeDiagnostic(): Promise<void> {

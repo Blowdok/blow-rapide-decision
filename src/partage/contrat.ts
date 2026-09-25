@@ -3,7 +3,7 @@
 
 import type { ProgressionBanc, ResultatBanc } from './banc';
 import type { Reglages, ReglagesPartiels } from './reglages';
-import type { DocumentIndexe, ErreurIndexation, IdProfil, Recherche, Resume, Triage } from './types';
+import type { DocumentIndexe, ErreurIndexation, IdProfil, Operation, Recherche, Resume, Triage } from './types';
 
 export const CANAUX = {
   reglagesLire: 'reglages:lire',
@@ -13,6 +13,7 @@ export const CANAUX = {
   modelesOllama: 'services:modeles-ollama',
   dossierChoisir: 'dossier:choisir',
   dossierIndexer: 'dossier:indexer',
+  dossierAnnuler: 'dossier:annuler',
   dossierEtat: 'dossier:etat',
   documentLire: 'document:lire',
   documentsTrier: 'documents:trier',
@@ -61,6 +62,10 @@ export interface EtatCorpus {
   dossier: string;
   documents: ResumeDocument[];
   erreurs: ErreurIndexation[];
+  /** Index sémantique prêt (option) : modèle et nombre de passages. */
+  semantique: { modele: string; passages: number } | null;
+  /** Avis sur les options : pages scannées non lues, recherche sémantique indisponible… */
+  avis: string[];
 }
 
 export interface DetailDocument extends ResumeDocument {
@@ -69,9 +74,16 @@ export interface DetailDocument extends ResumeDocument {
   resume: Resume | null;
 }
 
+export const LIBELLES_OPERATION: Record<Operation, string> = {
+  decision: 'Décision',
+  redaction: 'Rédaction',
+  plongement: 'Plongement',
+  ocr: 'Lecture OCR'
+};
+
 export interface EntreeJournal {
   date: string;
-  operation: 'decision' | 'redaction';
+  operation: Operation;
   moteur: string;
   modele: string;
   caracteres: number;
@@ -85,7 +97,16 @@ export interface ResultatComparaison {
 }
 
 export type Progression =
-  | { type: 'indexation'; traites: number; total: number; fichier: string }
+  | {
+      type: 'indexation';
+      /** Extraction des fichiers, puis plongements des passages (option). */
+      etape: 'extraction' | 'plongements';
+      traites: number;
+      total: number;
+      fichier: string;
+      /** Page scannée en cours de lecture par OCR (option). */
+      ocr?: { page: number; pages: number };
+    }
   | { type: 'triage'; fait: number; total: number }
   | ({ type: 'banc' } & ProgressionBanc);
 
@@ -103,6 +124,8 @@ export interface ApiBureau {
   dossier: {
     choisir(): Promise<string | null>;
     indexer(chemin: string): Promise<EtatCorpus>;
+    /** Interrompt l'indexation en cours ; le dossier indexé avant reste ouvert. */
+    annuler(): Promise<void>;
     etat(): Promise<EtatCorpus | null>;
   };
   documents: {

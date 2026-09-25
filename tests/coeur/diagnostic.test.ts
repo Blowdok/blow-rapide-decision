@@ -63,3 +63,32 @@ describe('diagnostic', () => {
     expect(etats[2]).toEqual({ service: 'Jev', ok: true, detail: 'Accès direct TypeSafe valide, modèles : jev-1.13.' });
   });
 });
+
+describe('diagnostic des options facultatives', () => {
+  const options = fusionnerReglages(REGLAGES_PAR_DEFAUT, { semantique: { active: true }, ocr: { active: true } });
+
+  it('vérifie les modèles des options actives', async () => {
+    const { fetch } = services({ ollama: ['qwen3.5:4b', 'embeddinggemma:latest', 'minicpm-v4.6:1b'] });
+    const [ollama] = await diagnostiquer(options, {}, fetch);
+    expect(ollama).toEqual({
+      service: 'Ollama',
+      ok: true,
+      detail: 'Joignable, 3 modèle(s) installé(s), dont qwen3.5:4b, embeddinggemma et minicpm-v4.6:1b.'
+    });
+  });
+
+  it('dit à quoi sert un modèle d’option absent', async () => {
+    const { fetch } = services({ ollama: ['qwen3.5:4b'] });
+    const [ollama] = await diagnostiquer(options, {}, fetch);
+    expect(ollama?.detail).toBe(
+      'Modèle absent : lancez « ollama pull embeddinggemma » (recherche sémantique), ' +
+        'lancez « ollama pull minicpm-v4.6:1b » (lecture des PDF scannés).'
+    );
+  });
+
+  it('ignore les modèles des options désactivées', async () => {
+    const { fetch } = services({ ollama: ['qwen3.5:4b'] });
+    const [ollama] = await diagnostiquer(REGLAGES_PAR_DEFAUT, {}, fetch);
+    expect(ollama?.ok).toBe(true);
+  });
+});

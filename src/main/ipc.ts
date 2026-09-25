@@ -100,6 +100,7 @@ export function brancherCanaux(options: OptionsCanaux): void {
     stockage.dernierDossier = etat.dossier;
     return etat;
   });
+  gerer(CANAUX.dossierAnnuler, () => service.annulerIndexation());
   gerer(CANAUX.dossierEtat, () => service.etatCorpus());
 
   gerer(CANAUX.documentLire, (id) => service.detail(texte(id, 'document')));

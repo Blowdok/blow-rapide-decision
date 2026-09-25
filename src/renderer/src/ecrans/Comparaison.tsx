@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ResultatComparaison } from '../../../partage/contrat';
-import { formaterNombre, formaterPourcentage } from '../../../partage/format';
 import { PROFILS } from '../../../partage/reglages';
-import { celluleClassement, libelleAttente, lignesSynthese, syntheseRechercheLexicale } from '../../../partage/synthese';
+import { celluleClassement, libelleAttente, lignesSynthese, phrasesSansDecision } from '../../../partage/synthese';
 import type { IdProfil } from '../../../partage/types';
 import { api, messageErreur } from '../api';
 import { BarreProgression, Message } from '../composants';
@@ -13,8 +12,11 @@ const ETAPES = { classement: 'classement', recherche: 'recherche', resume: 'rés
 function Resultats({ comparaison }: { comparaison: ResultatComparaison }) {
   const { resultat } = comparaison;
   const { recommandation, profils } = resultat;
-  const lexicale = syntheseRechercheLexicale(resultat);
   const reference = profils.find((p) => p.classement.length);
+  // Classement fusionné sans décision, quand la recherche sémantique (option) a servi.
+  const fusionnee = resultat.semantique?.recherche.length ? resultat.semantique.recherche : null;
+  const rang = (r: { rangPertinent: number | null; erreur?: string } | undefined) =>
+    !r ? '–' : r.erreur ? 'erreur' : (r.rangPertinent ?? 'absent');
   return (
     <>
       <section className={`recommandation ${recommandation.profil ? `recommandation-${recommandation.profil}` : ''}`}>
@@ -53,10 +55,11 @@ function Resultats({ comparaison }: { comparaison: ResultatComparaison }) {
           </tbody>
         </table>
       </div>
-      <p className="indice">
-        Recherche lexicale seule, commune à tous les modes : pertinent en tête {formaterPourcentage(lexicale.enTete)}, rang
-        réciproque moyen {formaterNombre(lexicale.mrr, 2)}.
-      </p>
+      {phrasesSansDecision(resultat).map((phrase) => (
+        <p key={phrase} className="indice">
+          {phrase}
+        </p>
+      ))}
 
       {reference && (
         <details className="bloc">
@@ -97,6 +100,7 @@ function Resultats({ comparaison }: { comparaison: ResultatComparaison }) {
                 <tr>
                   <th>Requête</th>
                   <th>Lexical seul</th>
+                  {fusionnee && <th>Lexical et sémantique</th>}
                   {profils.map((p) => (
                     <th key={p.profil}>{p.libelle}</th>
                   ))}
@@ -106,11 +110,11 @@ function Resultats({ comparaison }: { comparaison: ResultatComparaison }) {
                 {resultat.rechercheLexicale.map((r, i) => (
                   <tr key={r.requete}>
                     <td>{r.requete}</td>
-                    <td>{r.rangPertinent ?? 'absent'}</td>
-                    {profils.map((p) => {
-                      const rp = p.recherche[i];
-                      return <td key={p.profil}>{!rp ? '–' : rp.erreur ? 'erreur' : (rp.rangPertinent ?? 'absent')}</td>;
-                    })}
+                    <td>{rang(r)}</td>
+                    {fusionnee && <td>{rang(fusionnee[i])}</td>}
+                    {profils.map((p) => (
+                      <td key={p.profil}>{rang(p.recherche[i])}</td>
+                    ))}
                   </tr>
                 ))}
               </tbody>

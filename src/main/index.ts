@@ -3,6 +3,7 @@
 import { join } from 'node:path';
 import { app, BrowserWindow, dialog, Menu, type MenuItemConstructorOptions, nativeTheme, safeStorage, shell } from 'electron';
 import { configurationDepuisEnvironnement } from '../coeur/configuration';
+import { CacheFichiers } from '../coeur/outils/cache';
 import { CANAUX } from '../partage/contrat';
 import type { Theme } from '../partage/reglages';
 import { brancherCanaux } from './ipc';
@@ -105,7 +106,9 @@ app.whenReady().then(() => {
     reglages: () => stockage.reglages,
     // Les clés enregistrées dans l'application priment sur l'environnement.
     secrets: () => ({ ...secretsEnvironnement, ...stockage.secrets }),
-    envoyer: (progression) => fenetrePrincipale?.webContents.send(CANAUX.progression, progression)
+    envoyer: (progression) => fenetrePrincipale?.webContents.send(CANAUX.progression, progression),
+    // Texte des pages scannées déjà lues (option OCR), rangé avec les données de l'application.
+    cacheOcr: new CacheFichiers(join(app.getPath('userData'), 'cache-ocr'))
   });
   brancherCanaux({
     service,

@@ -145,6 +145,16 @@ export interface Recommandation {
   avertissements: string[];
 }
 
+/** Recherche sémantique (option) pendant le banc. */
+export interface SemantiqueBanc {
+  /** Modèle de plongement ; `null` si l'index sémantique n'a pas pu être calculé. */
+  modele: string | null;
+  /** Raison de l'indisponibilité. */
+  avis?: string;
+  /** Classement par BM25 et recherche sémantique fusionnés, sans décision (vide si indisponible). */
+  recherche: ResultatRechercheBanc[];
+}
+
 export interface ResultatBanc {
   jeu: { nom: string; description: string; documents: number };
   /** Date du banc, au format ISO. */
@@ -152,6 +162,8 @@ export interface ResultatBanc {
   toleranceQualite: number;
   /** Classement par la seule recherche lexicale (BM25), commun à tous les modes. */
   rechercheLexicale: ResultatRechercheBanc[];
+  /** Recherche sémantique (option) ; absente si l'option était désactivée. */
+  semantique?: SemantiqueBanc;
   profils: ResultatProfil[];
   recommandation: Recommandation;
 }
