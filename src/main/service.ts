@@ -10,6 +10,8 @@ import { rapportMarkdown } from '../coeur/banc/rapport';
 import { diagnostiquer } from '../coeur/diagnostic';
 import { type Corpus, indexerDossier } from '../coeur/index/corpus';
 import { listerModelesOllama } from '../coeur/moteurs/ollama';
+import { optionsFacultatives } from '../coeur/options';
+import type { CacheTexte } from '../coeur/outils/cache';
 import { executerParLots } from '../coeur/outils/concurrence';
 import type {
   DetailDocument,
@@ -28,6 +30,8 @@ export interface DependancesService {
   secrets(): Secrets;
   envoyer(progression: Progression): void;
   fetch?: typeof fetch;
+  /** Pages déjà lues par OCR (option), gardées entre deux lancements. */
+  cacheOcr?: CacheTexte;
 }
 
 const TAILLE_JOURNAL = 200;
@@ -60,6 +64,9 @@ export class ServiceAgent {
   #journal: EntreeJournal[] = [];
   #banc: ResultatComparaison | null = null;
   #annulation: AbortController | null = null;
+  #indexation: AbortController | null = null;
+  /** Vecteurs des passages déjà calculés : une réindexation ne recalcule que les passages changés. */
+  readonly #memoirePlongements = new Map<string, Float32Array>();
 
   constructor(dependances: DependancesService) {
     this.#deps = dependances;
@@ -111,22 +118,53 @@ export class ServiceAgent {
     };
   }
 
-  async indexer(dossier: string): Promise<EtatCorpus> {
-    this.#corpus = await indexerDossier(dossier, {
-      surProgression: (p) => this.#deps.envoyer({ type: 'indexation', ...p })
+  /** Moteurs des options actives (recherche sémantique, lecture OCR). */
+  #optionsFacultatives(reglages: Reglages) {
+    return optionsFacultatives(reglages, {
+      ...(this.#deps.fetch ? { fetch: this.#deps.fetch } : {}),
+      ...(this.#deps.cacheOcr ? { cacheOcr: this.#deps.cacheOcr } : {})
     });
-    this.#triages.clear();
-    this.#resumes.clear();
-    return this.etatCorpus() as EtatCorpus;
+  }
+
+  async indexer(dossier: string): Promise<EtatCorpus> {
+    if (this.#indexation) throw new Error('Une indexation est déjà en cours.');
+    const annulation = new AbortController();
+    this.#indexation = annulation;
+    try {
+      const corpus = await indexerDossier(dossier, {
+        ...this.#optionsFacultatives(this.#deps.reglages()),
+        memoirePlongements: this.#memoirePlongements,
+        surProgression: (p) => this.#deps.envoyer({ type: 'indexation', ...p }),
+        signal: annulation.signal
+      });
+      // Le dossier précédent reste ouvert jusqu'à la fin de la nouvelle indexation.
+      this.#corpus = corpus;
+      this.#triages.clear();
+      this.#resumes.clear();
+      this.#consigner(corpus.mesures);
+      return this.etatCorpus() as EtatCorpus;
+    } catch (erreur) {
+      if (annulation.signal.aborted) throw new Error('Indexation annulée.');
+      throw erreur;
+    } finally {
+      this.#indexation = null;
+    }
+  }
+
+  annulerIndexation(): void {
+    this.#indexation?.abort();
   }
 
   etatCorpus(): EtatCorpus | null {
     if (!this.#corpus) return null;
     const reglages = this.#deps.reglages();
+    const { semantique } = this.#corpus;
     return {
       dossier: this.#corpus.dossier,
       documents: this.#corpus.documents.map((d) => this.#resumeDocument(d, reglages)),
-      erreurs: this.#corpus.erreurs
+      erreurs: this.#corpus.erreurs,
+      semantique: semantique?.etat === 'pret' ? { modele: semantique.modele, passages: semantique.index.taille } : null,
+      avis: this.#corpus.avis
     };
   }
 
@@ -187,7 +225,11 @@ export class ServiceAgent {
       const reglages = this.#deps.reglages();
       const secrets = this.#deps.secrets();
       const jeu = await chargerJeu(dossierJeu);
-      const corpus = await indexerDossier(jeu.dossierDocuments);
+      const corpus = await indexerDossier(jeu.dossierDocuments, {
+        ...this.#optionsFacultatives(reglages),
+        signal: annulation.signal
+      });
+      this.#consigner(corpus.mesures);
       const problemes = problemesDuJeu(jeu, corpus, reglages.classement.categories);
       if (problemes.length) throw new ErreurJeu(`Jeu d’évaluation incohérent : ${problemes.slice(0, 5).join(' ')}`);
       const resultat = await executerBanc(jeu, corpus, {

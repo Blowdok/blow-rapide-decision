@@ -410,6 +410,18 @@ nav {
   max-width: 720px;
 }
 
+/* Barre d'avancement accompagnée d'un bouton d'annulation. */
+.avancement {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  max-width: 840px;
+}
+
+.avancement .progression {
+  flex: 1;
+}
+
 .progression-libelle {
   display: flex;
   justify-content: space-between;

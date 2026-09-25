@@ -1,8 +1,8 @@
 // Rapport du banc en Markdown, lisible par Blowdok et versionnable.
 
 import type { ResultatBanc } from '../../partage/banc';
-import { formaterDuree, formaterNombre, formaterPourcentage, TIRET } from '../../partage/format';
-import { celluleClassement, libelleAttente, lignesSynthese, syntheseRechercheLexicale } from '../../partage/synthese';
+import { formaterDuree, formaterNombre, TIRET } from '../../partage/format';
+import { celluleClassement, libelleAttente, lignesSynthese, phrasesSansDecision } from '../../partage/synthese';
 import { TARIF_JEV_ENTREE_USD_PAR_MILLION } from '../moteurs/jev';
 
 /** Échappe une valeur pour une cellule de tableau Markdown. */
@@ -18,13 +18,9 @@ function sectionSynthese(resultat: ResultatBanc): string {
   const lignes = lignesSynthese(profils).map(({ libelle, valeurs, importante }) =>
     importante ? [`**${libelle}**`, ...valeurs.map((v) => (v === TIRET ? v : `**${v}**`))] : [libelle, ...valeurs]
   );
-  const lexicale = syntheseRechercheLexicale(resultat);
-  return [
-    '## Synthèse',
-    tableau(['Critère', ...profils.map((p) => p.libelle)], lignes),
-    `Recherche lexicale seule (BM25), commune à tous les modes : pertinent en tête ${formaterPourcentage(lexicale.enTete)}, ` +
-      `rang réciproque moyen ${formaterNombre(lexicale.mrr, 2)}.`
-  ].join('\n\n');
+  return ['## Synthèse', tableau(['Critère', ...profils.map((p) => p.libelle)], lignes), ...phrasesSansDecision(resultat)].join(
+    '\n\n'
+  );
 }
 
 function sectionClassement(resultat: ResultatBanc): string {
@@ -45,16 +41,20 @@ function sectionRecherche(resultat: ResultatBanc): string {
     if (r.erreur) return 'erreur';
     return r.rangPertinent === null ? 'absent' : `${r.rangPertinent}`;
   };
+  // Colonne de la recherche fusionnée, quand la recherche sémantique (option) a servi.
+  const fusionnee = resultat.semantique?.recherche.length ? resultat.semantique.recherche : null;
   const lignes = resultat.rechercheLexicale.map((lexicale, i) => [
     lexicale.requete,
     lexicale.pertinents.join(', '),
     rang(lexicale),
+    ...(fusionnee ? [rang(fusionnee[i])] : []),
     ...resultat.profils.map((p) => rang(p.recherche[i]))
   ]);
+  const entetes = ['Requête', 'Document attendu', 'Lexical seul', ...(fusionnee ? ['Lexical et sémantique'] : [])];
   return [
     '## Recherche, requête par requête',
     'Rang du premier document pertinent (1 = en tête).',
-    tableau(['Requête', 'Document attendu', 'Lexical seul', ...resultat.profils.map((p) => p.libelle)], lignes)
+    tableau([...entetes, ...resultat.profils.map((p) => p.libelle)], lignes)
   ].join('\n\n');
 }
 
@@ -86,6 +86,10 @@ function sectionMethode(resultat: ResultatBanc): string {
       '- Indice de qualité : moyenne sur 100 de la justesse de la catégorie, de l’action requise et de l’urgence, ' +
         'du rang réciproque moyen de la recherche et de la part des faits attendus présents dans les résumés. ' +
         'Une erreur compte comme une réponse fausse.',
+      '- Recherche : l’index propose des passages, puis chaque mode juge leur pertinence. ' +
+        (resultat.semantique?.modele
+          ? `La recherche sémantique (option, ${resultat.semantique.modele}) complétait BM25 ; les deux classements étaient fusionnés par rang réciproque.`
+          : 'L’index était la recherche lexicale BM25.'),
       `- Tolérance : ${tolerance} points. Le mode local est recommandé tant que le mode hybride ne le dépasse pas de plus de ${tolerance} points.`,
       `- Coûts : montants facturés par OpenRouter pendant le banc (Jev : ${formaterNombre(TARIF_JEV_ENTREE_USD_PAR_MILLION, 3)} $ par million de jetons d’entrée, sortie gratuite). ` +
         'L’estimation pour 1 000 documents extrapole le coût moyen d’un triage et d’un résumé. Le mode local ne compte ni l’électricité ni le matériel.',

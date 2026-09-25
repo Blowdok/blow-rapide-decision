@@ -23,6 +23,7 @@ const api: ApiBureau = {
   dossier: {
     choisir: () => appeler(CANAUX.dossierChoisir),
     indexer: (chemin) => appeler(CANAUX.dossierIndexer, chemin),
+    annuler: () => appeler(CANAUX.dossierAnnuler),
     etat: () => appeler(CANAUX.dossierEtat)
   },
   documents: {

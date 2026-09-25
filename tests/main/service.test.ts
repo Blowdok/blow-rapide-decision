@@ -1,9 +1,10 @@
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ServiceAgent } from '../../src/main/service';
 import type { Progression } from '../../src/partage/contrat';
 import { fusionnerReglages, REGLAGES_PAR_DEFAUT, type Reglages, type Secrets } from '../../src/partage/reglages';
 import { type AppelEnregistre, fauxFetch, reponseJson } from '../outils/faux-fetch';
+import { ollamaPlongementsSimule } from '../outils/plongements';
 
 const DEMO = resolve(import.meta.dirname, '../../jeux-evaluation/demo');
 
@@ -98,5 +99,63 @@ describe('service de l’application', () => {
     expect(agent.dernierBanc?.resultat).toBe(resultat);
     expect(progressions.some((p) => p.type === 'banc' && p.etape === 'resume')).toBe(true);
     await expect(agent.lancerBanc(DEMO, [])).rejects.toThrow('Choisissez au moins un mode à comparer.');
+  });
+});
+
+describe('options facultatives dans le service', () => {
+  const semantique = { active: true, modele: 'embeddinggemma' };
+
+  it('indexe avec la recherche sémantique et s’en sert pour chercher', async () => {
+    const { fetch } = ollamaPlongementsSimule();
+    const { agent, progressions } = service({ reglages: { semantique }, fetch });
+    const etat = await agent.indexer(resolve(DEMO, 'documents'));
+    expect(etat.semantique).toEqual({ modele: 'embeddinggemma', passages: expect.any(Number) });
+    expect(etat.avis).toEqual([]);
+    expect(progressions.some((p) => p.type === 'indexation' && p.etape === 'plongements')).toBe(true);
+
+    const recherche = await agent.rechercher('taxe foncière');
+    expect(recherche.modelePlongement).toBe('embeddinggemma');
+    // Ollama tourne sur ce PC : rien ne part dans le journal des envois.
+    expect(agent.journal()).toEqual([]);
+  });
+
+  it('garde la recherche par mots-clés quand Ollama est éteint', async () => {
+    const { agent } = service({ reglages: { semantique }, fetch: fauxFetch(new TypeError('fetch failed')).fetch });
+    const etat = await agent.indexer(resolve(DEMO, 'documents'));
+    expect(etat.documents).toHaveLength(12);
+    expect(etat.semantique).toBeNull();
+    expect(etat.avis).toEqual([expect.stringMatching(/^Recherche sémantique indisponible : Ollama est injoignable/)]);
+    const recherche = await agent.rechercher('taxe foncière');
+    expect(recherche.resultats.length).toBeGreaterThan(0);
+    expect(recherche.avis).toMatch(/Réindexez le dossier une fois le problème réglé/);
+  });
+
+  it('consigne les plongements envoyés à un Ollama distant', async () => {
+    const { fetch } = ollamaPlongementsSimule();
+    const reglages = { semantique, ollama: { ...REGLAGES_PAR_DEFAUT.ollama, url: 'http://192.168.1.20:11434' } };
+    const { agent } = service({ reglages, fetch });
+    await agent.indexer(resolve(DEMO, 'documents'));
+    const [entree] = agent.journal();
+    expect(entree).toMatchObject({ operation: 'plongement', moteur: 'Ollama', modele: 'embeddinggemma', coutUsd: 0 });
+    expect(entree?.caracteres).toBeGreaterThan(1000);
+  });
+
+  it('annule une indexation en cours et garde le dossier déjà ouvert', async () => {
+    // Ollama ne répond jamais : seule l'annulation termine l'appel.
+    const enAttente = ((_url: string, init: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+      })) as typeof fetch;
+    const { agent, progressions, changer } = service({ fetch: enAttente });
+    await agent.indexer(resolve(DEMO, 'documents'));
+
+    changer({ semantique });
+    const indexation = agent.indexer(resolve(DEMO, 'documents'));
+    await expect(agent.indexer(resolve(DEMO, 'documents'))).rejects.toThrow('Une indexation est déjà en cours.');
+    await vi.waitFor(() => expect(progressions.some((p) => p.type === 'indexation' && p.etape === 'plongements')).toBe(true));
+    agent.annulerIndexation();
+    await expect(indexation).rejects.toThrow('Indexation annulée.');
+    expect(agent.etatCorpus()).toMatchObject({ semantique: null, avis: [] });
+    expect(agent.etatCorpus()?.documents).toHaveLength(12);
   });
 });

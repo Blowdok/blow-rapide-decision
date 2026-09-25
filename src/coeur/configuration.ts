@@ -20,6 +20,10 @@ export function configurationDepuisEnvironnement(env: NodeJS.ProcessEnv = proces
     if (valeur === undefined) return undefined;
     return ['1', 'oui', 'true', 'vrai'].includes(valeur);
   };
+  const nombre = (nom: string): number | undefined => {
+    const valeur = lire(nom);
+    return valeur === undefined ? undefined : Number(valeur);
+  };
   // Ne garde que les valeurs définies, pour ne pas écraser les défauts.
   const definies = <T extends object>(objet: T): Partial<T> =>
     Object.fromEntries(Object.entries(objet).filter(([, v]) => v !== undefined)) as Partial<T>;
@@ -38,7 +42,13 @@ export function configurationDepuisEnvironnement(env: NodeJS.ProcessEnv = proces
       acces: lire('BRD_JEV_ACCES') as AccesJev | undefined,
       modele: lire('BRD_JEV_MODELE')
     }),
-    confidentialite: definies({ masquage: booleen('BRD_MASQUAGE') })
+    confidentialite: definies({ masquage: booleen('BRD_MASQUAGE') }),
+    semantique: definies({ active: booleen('BRD_SEMANTIQUE'), modele: lire('BRD_OLLAMA_MODELE_PLONGEMENT') }),
+    ocr: definies({
+      active: booleen('BRD_OCR'),
+      modele: lire('BRD_OLLAMA_MODELE_OCR'),
+      pagesMax: nombre('BRD_OCR_PAGES_MAX')
+    })
   });
 
   return {

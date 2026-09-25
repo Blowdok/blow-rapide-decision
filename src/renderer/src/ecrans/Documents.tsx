@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { DetailDocument } from '../../../partage/contrat';
+import type { DetailDocument, Progression } from '../../../partage/contrat';
 import { formaterEntier, formaterPourcentage } from '../../../partage/format';
 import { api, messageErreur } from '../api';
 import { BarreProgression, BilanMesures, Jauge, Message, Pastille, Urgence } from '../composants';
@@ -9,6 +9,25 @@ type Operation = 'indexation' | 'triage' | 'resume' | null;
 
 const taille = (octets: number): string =>
   octets < 1024 ? `${octets} o` : octets < 1_048_576 ? `${formaterEntier(octets / 1024)} Ko` : `${(octets / 1_048_576).toFixed(1).replace('.', ',')} Mo`;
+
+/** Avancement de l'indexation : fichiers, pages lues par OCR, puis plongements (options). */
+function AvancementIndexation({ progression, annuler }: { progression: Progression | null; annuler: () => void }) {
+  if (progression?.type !== 'indexation') return null;
+  const libelle =
+    progression.etape === 'plongements'
+      ? 'Recherche sémantique : calcul des vecteurs des passages'
+      : progression.ocr
+        ? `Lecture OCR de ${progression.fichier} : page ${progression.ocr.page} sur ${progression.ocr.pages}`
+        : `Indexation : ${progression.fichier}`;
+  return (
+    <div className="avancement">
+      <BarreProgression fait={progression.traites} total={progression.total} libelle={libelle} />
+      <button type="button" onClick={annuler}>
+        Annuler
+      </button>
+    </div>
+  );
+}
 
 export function EcranDocuments() {
   const { etat, corpus, definirCorpus, rafraichirCorpus, progression } = useApplication();
@@ -52,9 +71,11 @@ export function EcranDocuments() {
 
   const indexer = (chemin: string) =>
     executer('indexation', async () => {
+      const nouveau = await api.dossier.indexer(chemin);
       definirSelection(null);
-      definirCorpus(await api.dossier.indexer(chemin));
+      definirCorpus(nouveau);
     });
+  const annulerIndexation = () => void api.dossier.annuler();
 
   const choisirDossier = async () => {
     const chemin = await api.dossier.choisir();
@@ -99,9 +120,7 @@ export function EcranDocuments() {
               </button>
             )}
           </div>
-          {operation === 'indexation' && progression?.type === 'indexation' && (
-            <BarreProgression fait={progression.traites} total={progression.total} libelle={`Indexation : ${progression.fichier}`} />
-          )}
+          {operation === 'indexation' && <AvancementIndexation progression={progression} annuler={annulerIndexation} />}
           {erreur && <Message type="erreur">{erreur}</Message>}
         </div>
       </section>
@@ -149,13 +168,21 @@ export function EcranDocuments() {
         </label>
       </div>
 
-      {operation === 'indexation' && progression?.type === 'indexation' && (
-        <BarreProgression fait={progression.traites} total={progression.total} libelle={`Indexation : ${progression.fichier}`} />
-      )}
+      {operation === 'indexation' && <AvancementIndexation progression={progression} annuler={annulerIndexation} />}
       {operation === 'triage' && progression?.type === 'triage' && (
         <BarreProgression fait={progression.fait} total={progression.total} libelle="Triage des documents" />
       )}
       {erreur && <Message type="erreur">{erreur}</Message>}
+      {corpus.avis.map((avis) => (
+        <Message key={avis} type="alerte">
+          {avis}
+        </Message>
+      ))}
+      {corpus.semantique && (
+        <p className="indice">
+          Recherche sémantique prête : {formaterEntier(corpus.semantique.passages)} passages, modèle {corpus.semantique.modele}.
+        </p>
+      )}
       {corpus.erreurs.length > 0 && (
         <details className="erreurs-lecture">
           <summary>{corpus.erreurs.length} fichier(s) non lu(s)</summary>
@@ -193,6 +220,12 @@ export function EcranDocuments() {
                 >
                   <td>
                     <span className="nom-document">{d.nom}</span>
+                    {d.pagesOcr ? (
+                      <span title={`${d.pagesOcr} page(s) lue(s) par OCR`}>
+                        {' '}
+                        <Pastille ton="neutre">OCR</Pastille>
+                      </span>
+                    ) : null}
                     {d.id !== d.nom && <span className="dossier-document">{d.id.slice(0, -d.nom.length)}</span>}
                   </td>
                   <td>
@@ -225,6 +258,7 @@ export function EcranDocuments() {
               <p className="meta">
                 {detail.format.toUpperCase()} · {taille(detail.taille)} · {formaterEntier(detail.caracteres)} caractères · modifié le{' '}
                 {new Date(detail.modifieLe).toLocaleDateString('fr-FR')}
+                {detail.pagesOcr ? ` · ${detail.pagesOcr} page(s) lue(s) par OCR` : ''}
               </p>
               <div className="actions">
                 <button type="button" onClick={() => void api.documents.ouvrir(detail.id).catch((e: unknown) => definirErreur(messageErreur(e)))}>

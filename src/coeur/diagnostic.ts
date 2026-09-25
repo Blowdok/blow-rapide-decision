@@ -13,18 +13,24 @@ export type { EtatService };
 async function etatOllama(reglages: Reglages, fetchFn: typeof fetch): Promise<EtatService> {
   try {
     const installes = await listerModelesOllama(reglages.ollama.url, fetchFn);
-    const voulus = [...new Set([reglages.ollama.modeleDecision, reglages.ollama.modeleResume])];
+    // Modèle voulu → usage ; les options actives ajoutent leurs modèles.
+    const usages = new Map<string, string>();
+    for (const nom of [reglages.ollama.modeleDecision, reglages.ollama.modeleResume]) usages.set(nom, '');
+    if (reglages.semantique.active) usages.set(reglages.semantique.modele, 'recherche sémantique');
+    if (reglages.ocr.active) usages.set(reglages.ocr.modele, 'lecture des PDF scannés');
+    const voulus = [...usages.keys()];
     // Ollama ajoute « :latest » aux noms sans étiquette.
     const present = (nom: string): boolean => installes.includes(nom) || installes.includes(`${nom}:latest`);
     const absents = voulus.filter((nom) => !present(nom));
     if (absents.length) {
-      return {
-        service: 'Ollama',
-        ok: false,
-        detail: `Modèle absent : ${absents.map((nom) => `lancez « ollama pull ${nom} »`).join(', ')}.`
+      const consigne = (nom: string): string => {
+        const usage = usages.get(nom);
+        return `lancez « ollama pull ${nom} »${usage ? ` (${usage})` : ''}`;
       };
+      return { service: 'Ollama', ok: false, detail: `Modèle absent : ${absents.map(consigne).join(', ')}.` };
     }
-    return { service: 'Ollama', ok: true, detail: `Joignable, ${installes.length} modèle(s) installé(s), dont ${voulus.join(' et ')}.` };
+    const liste = voulus.length > 1 ? `${voulus.slice(0, -1).join(', ')} et ${voulus.at(-1)}` : voulus.join('');
+    return { service: 'Ollama', ok: true, detail: `Joignable, ${installes.length} modèle(s) installé(s), dont ${liste}.` };
   } catch (erreur) {
     return { service: 'Ollama', ok: false, detail: (erreur as Error).message };
   }

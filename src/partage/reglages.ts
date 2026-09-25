@@ -45,10 +45,22 @@ export interface Reglages {
     caracteresMax: number;
   };
   recherche: {
-    /** Passages retenus par la recherche lexicale avant la décision de pertinence. */
+    /** Passages proposés par l'index avant la décision de pertinence. */
     candidats: number;
     /** Résultats affichés. */
     resultats: number;
+  };
+  /** Option : recherche sémantique par un modèle de plongement d'Ollama, en plus de BM25. */
+  semantique: {
+    active: boolean;
+    modele: string;
+  };
+  /** Option : lecture des pages scannées des PDF par un modèle de vision d'Ollama. */
+  ocr: {
+    active: boolean;
+    modele: string;
+    /** Pages lues au plus par document. */
+    pagesMax: number;
   };
   resume: {
     /** Au-delà, le document est résumé par parties puis synthétisé. */
@@ -83,6 +95,9 @@ export const REGLAGES_PAR_DEFAUT: Reglages = {
   confidentialite: { masquage: true },
   classement: { categories: CATEGORIES_PAR_DEFAUT, seuilConfiance: 0.6, caracteresMax: 6000 },
   recherche: { candidats: 12, resultats: 8 },
+  // Options désactivées par défaut : l'agent fonctionne sans ces modèles.
+  semantique: { active: false, modele: 'embeddinggemma' },
+  ocr: { active: false, modele: 'minicpm-v4.6:1b', pagesMax: 10 },
   resume: { caracteresParPartie: 12_000, maxJetons: 800 }
 };
 
@@ -113,6 +128,11 @@ const borner = (valeur: number, min: number, max: number): number => Math.min(ma
 /** Garde la valeur de base si la nouvelle n'est pas un nombre fini (champ vidé, JSON abîmé). */
 const fini = (valeur: unknown, base: number): number => (typeof valeur === 'number' && Number.isFinite(valeur) ? valeur : base);
 
+const booleen = (valeur: unknown, base: boolean): boolean => (typeof valeur === 'boolean' ? valeur : base);
+
+/** Nom de modèle sans espaces autour ; la base si le champ est vide. */
+const nomModele = (valeur: unknown, base: string): string => (typeof valeur === 'string' && valeur.trim() ? valeur.trim() : base);
+
 /** Fusionne des réglages partiels dans une base, en bornant les valeurs numériques. */
 export function fusionnerReglages(base: Reglages, partiel: ReglagesPartiels = {}): Reglages {
   const r: Reglages = {
@@ -124,6 +144,8 @@ export function fusionnerReglages(base: Reglages, partiel: ReglagesPartiels = {}
     confidentialite: { ...base.confidentialite, ...partiel.confidentialite },
     classement: { ...base.classement, ...partiel.classement },
     recherche: { ...base.recherche, ...partiel.recherche },
+    semantique: { ...base.semantique, ...partiel.semantique },
+    ocr: { ...base.ocr, ...partiel.ocr },
     resume: { ...base.resume, ...partiel.resume }
   };
   r.ollama.contexte = Math.round(borner(fini(r.ollama.contexte, base.ollama.contexte), 2048, 262_144));
@@ -135,6 +157,11 @@ export function fusionnerReglages(base: Reglages, partiel: ReglagesPartiels = {}
     borner(fini(r.resume.caracteresParPartie, base.resume.caracteresParPartie), 1000, 100_000)
   );
   r.resume.maxJetons = Math.round(borner(fini(r.resume.maxJetons, base.resume.maxJetons), 100, 8000));
+  r.semantique.active = booleen(r.semantique.active, base.semantique.active);
+  r.semantique.modele = nomModele(r.semantique.modele, base.semantique.modele);
+  r.ocr.active = booleen(r.ocr.active, base.ocr.active);
+  r.ocr.modele = nomModele(r.ocr.modele, base.ocr.modele);
+  r.ocr.pagesMax = Math.round(borner(fini(r.ocr.pagesMax, base.ocr.pagesMax), 1, 200));
   if (r.jev.acces !== 'openrouter' && r.jev.acces !== 'typesafe') r.jev.acces = base.jev.acces;
   if (!(r.apparence.theme in THEMES)) r.apparence.theme = base.apparence.theme;
   // Catégories : identifiant et libellé obligatoires, identifiants uniques.

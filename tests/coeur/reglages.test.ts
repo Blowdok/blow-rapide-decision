@@ -60,3 +60,30 @@ describe('thème', () => {
     expect(fusionnerReglages(REGLAGES_PAR_DEFAUT, { apparence: { theme: 'fluo' as never } }).apparence.theme).toBe('systeme');
   });
 });
+
+describe('options facultatives', () => {
+  it('sont désactivées par défaut, avec les modèles installés chez Blowdok', () => {
+    expect(REGLAGES_PAR_DEFAUT.semantique).toEqual({ active: false, modele: 'embeddinggemma' });
+    expect(REGLAGES_PAR_DEFAUT.ocr).toEqual({ active: false, modele: 'minicpm-v4.6:1b', pagesMax: 10 });
+  });
+
+  it('valident leurs valeurs', () => {
+    const reglages = fusionnerReglages(REGLAGES_PAR_DEFAUT, {
+      semantique: { active: 'oui' as never, modele: '  nomic-embed-text-v2-moe  ' },
+      ocr: { active: true, modele: '   ', pagesMax: 1000 }
+    });
+    expect(reglages.semantique).toEqual({ active: false, modele: 'nomic-embed-text-v2-moe' });
+    expect(reglages.ocr).toEqual({ active: true, modele: 'minicpm-v4.6:1b', pagesMax: 200 });
+  });
+
+  it('se règlent aussi par l’environnement pour la ligne de commande', () => {
+    const { reglages } = configurationDepuisEnvironnement({
+      BRD_SEMANTIQUE: '1',
+      BRD_OLLAMA_MODELE_PLONGEMENT: 'nomic-embed-text-v2-moe',
+      BRD_OCR: 'oui',
+      BRD_OCR_PAGES_MAX: 'beaucoup'
+    });
+    expect(reglages.semantique).toEqual({ active: true, modele: 'nomic-embed-text-v2-moe' });
+    expect(reglages.ocr).toEqual({ active: true, modele: 'minicpm-v4.6:1b', pagesMax: 10 });
+  });
+});

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { sansAccents } from '../../../coeur/texte/normalisation';
-import type { EntreeJournal, EtatService, NomCle } from '../../../partage/contrat';
+import { type EntreeJournal, type EtatService, LIBELLES_OPERATION, type NomCle } from '../../../partage/contrat';
 import { formaterEntier, formaterUsd } from '../../../partage/format';
 import type { Reglages } from '../../../partage/reglages';
 import type { Categorie } from '../../../partage/types';
@@ -63,6 +63,13 @@ function Cle({ nom, libelle }: { nom: NomCle; libelle: string }) {
       {erreur && <Message type="erreur">{erreur}</Message>}
     </div>
   );
+}
+
+/** Alerte si le modèle d'une option active manque dans Ollama (liste connue seulement). */
+function ModeleAbsent({ modele, actif, modeles }: { modele: string; actif: boolean; modeles: string[] }) {
+  const nom = modele.trim();
+  if (!actif || !nom || modeles.length === 0 || modeles.includes(nom) || modeles.includes(`${nom}:latest`)) return null;
+  return <Message type="alerte">Modèle absent d’Ollama : lancez « ollama pull {nom} ».</Message>;
 }
 
 function EditeurCategories({ categories, changer }: { categories: Categorie[]; changer: (c: Categorie[]) => void }) {
@@ -283,7 +290,7 @@ export function EcranReglages() {
                 {journal.map((e, i) => (
                   <tr key={`${e.date}-${i}`}>
                     <td>{new Date(e.date).toLocaleTimeString('fr-FR')}</td>
-                    <td>{e.operation === 'decision' ? 'Décision' : 'Rédaction'}</td>
+                    <td>{LIBELLES_OPERATION[e.operation]}</td>
                     <td>
                       {e.moteur} ({e.modele})
                     </td>
@@ -338,6 +345,44 @@ export function EcranReglages() {
           <span>Longueur maximale d’un résumé (jetons)</span>
           <input type="number" min={100} step={100} value={brouillon.resume.maxJetons} onChange={(e) => section('resume', { maxJetons: nombre(e.target.value) })} />
         </label>
+      </section>
+
+      <section className="carte" aria-labelledby="titre-options">
+        <h2 id="titre-options">Options locales facultatives</h2>
+        <p className="indice">
+          Désactivées par défaut : l’agent fonctionne sans elles. Elles utilisent des modèles d’Ollama sur ce PC, dans tous les
+          modes, et s’appliquent à la prochaine indexation d’un dossier.
+        </p>
+        <label className="case">
+          <input type="checkbox" checked={brouillon.semantique.active} onChange={(e) => section('semantique', { active: e.target.checked })} />
+          Recherche sémantique : trouver des passages par le sens, pas seulement par les mots
+        </label>
+        <label className="champ">
+          <span>Modèle de plongement</span>
+          <input list="modeles-ollama" value={brouillon.semantique.modele} onChange={(e) => section('semantique', { modele: e.target.value })} />
+        </label>
+        <ModeleAbsent modele={brouillon.semantique.modele} actif={brouillon.semantique.active} modeles={modeles} />
+        <p className="indice">
+          Par exemple embeddinggemma ou nomic-embed-text-v2-moe. Les vecteurs des passages sont calculés à l’indexation ; la
+          recherche fusionne ensuite les classements par mots-clés et par le sens.
+        </p>
+        <label className="case">
+          <input type="checkbox" checked={brouillon.ocr.active} onChange={(e) => section('ocr', { active: e.target.checked })} />
+          Lecture des PDF scannés : un modèle de vision lit les pages sans texte
+        </label>
+        <label className="champ">
+          <span>Modèle de vision</span>
+          <input list="modeles-ollama" value={brouillon.ocr.modele} onChange={(e) => section('ocr', { modele: e.target.value })} />
+        </label>
+        <label className="champ">
+          <span>Pages lues au plus par document</span>
+          <input type="number" min={1} max={200} value={brouillon.ocr.pagesMax} onChange={(e) => section('ocr', { pagesMax: nombre(e.target.value) })} />
+        </label>
+        <ModeleAbsent modele={brouillon.ocr.modele} actif={brouillon.ocr.active} modeles={modeles} />
+        <p className="indice">
+          Par exemple minicpm-v4.6:1b. Comptez plusieurs secondes par page. Le texte lu est gardé dans le dossier de données de
+          l’application, pour ne pas relire les mêmes pages.
+        </p>
       </section>
     </section>
   );

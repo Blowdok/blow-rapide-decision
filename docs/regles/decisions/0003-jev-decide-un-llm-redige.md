@@ -40,3 +40,4 @@ Recherche du 25 septembre 2026 :
   - un modèle OpenJev local comme moteur de décision ;
   - les modèles de plongement (`embeddinggemma`, `nomic-embed-text-v2-moe`) pour une recherche sémantique ;
   - `minicpm-v4.6:1b` pour lire les PDF scannés.
+- Ces deux dernières pistes sont devenues des options facultatives : [RAD 0005](0005-options-semantique-et-ocr.md).

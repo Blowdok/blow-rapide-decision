@@ -9,12 +9,14 @@ import { calculerMetriques, evaluerFaits, rangDuPremierPertinent } from '../../s
 import { nomDuRapport, rapportMarkdown } from '../../src/coeur/banc/rapport';
 import { recommander } from '../../src/coeur/banc/recommandation';
 import { type Corpus, indexerDossier } from '../../src/coeur/index/corpus';
+import { MoteurPlongementOllama } from '../../src/coeur/moteurs/plongements';
 import { MoteurDecisionReference, MoteurRedactionReference } from '../../src/coeur/moteurs/reference';
 import type { MoteurDecision } from '../../src/coeur/moteurs/types';
 import type { JeuEvaluation, ProgressionBanc, ResultatProfil } from '../../src/partage/banc';
-import { REGLAGES_PAR_DEFAUT } from '../../src/partage/reglages';
+import { fusionnerReglages, REGLAGES_PAR_DEFAUT } from '../../src/partage/reglages';
 import type { IdProfil } from '../../src/partage/types';
 import { dossierTemporaire } from '../outils/fabriques';
+import { ollamaPlongementsSimule } from '../outils/plongements';
 
 const DOSSIER_DEMO = resolve(import.meta.dirname, '../../jeux-evaluation/demo');
 
@@ -205,6 +207,45 @@ describe('exécution du banc', () => {
     expect(rapport).toContain('### urssaf-mise-en-demeure.txt');
     expect(rapport).toContain('## Méthode');
     expect(nomDuRapport(new Date('2026-09-25T08:05:00'))).toBe('comparaison-2026-09-25-0805');
+  });
+});
+
+describe('banc avec la recherche sémantique (option)', () => {
+  const reglages = fusionnerReglages(REGLAGES_PAR_DEFAUT, { semantique: { active: true } });
+  const options = {
+    reglages,
+    profils: ['reference'] as IdProfil[],
+    fabriquerProfil: (id: IdProfil) => creerProfil(id, { reglages, secrets: {} })
+  };
+
+  it('ajoute le classement fusionné sans décision, commun à tous les modes', async () => {
+    const { fetch } = ollamaPlongementsSimule();
+    const plongement = new MoteurPlongementOllama({ url: 'http://127.0.0.1:11434', modele: 'embeddinggemma', fetch });
+    const corpusSemantique = await indexerDossier(jeu.dossierDocuments, { plongement });
+    const resultat = await executerBanc(jeu, corpusSemantique, options);
+
+    expect(resultat.semantique?.modele).toBe('embeddinggemma');
+    expect(resultat.semantique?.recherche).toHaveLength(11);
+    expect(resultat.semantique?.recherche.every((r) => !r.erreur)).toBe(true);
+    const rapport = rapportMarkdown(resultat);
+    expect(rapport).toContain('| Requête | Document attendu | Lexical seul | Lexical et sémantique | Référence sans IA |');
+    expect(rapport).toContain('Recherche lexicale et sémantique fusionnées (embeddinggemma), sans décision : pertinent en tête');
+    expect(rapport).toContain('La recherche sémantique (option, embeddinggemma) complétait BM25');
+  });
+
+  it('signale une recherche sémantique demandée mais indisponible', async () => {
+    const resultat = await executerBanc(jeu, corpus, options);
+    expect(resultat.semantique).toEqual({ modele: null, avis: 'index sémantique absent du corpus.', recherche: [] });
+    expect(rapportMarkdown(resultat)).toContain(
+      'Recherche sémantique demandée mais indisponible : index sémantique absent du corpus. ' +
+        'Les modes ont jugé les passages de la seule recherche lexicale.'
+    );
+  });
+
+  it('n’ajoute rien quand l’option est désactivée', async () => {
+    const resultat = await executerBanc(jeu, corpus, { ...options, reglages: REGLAGES_PAR_DEFAUT });
+    expect(resultat).not.toHaveProperty('semantique');
+    expect(rapportMarkdown(resultat)).not.toContain('Lexical et sémantique');
   });
 });
 

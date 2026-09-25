@@ -2,7 +2,7 @@
 
 import type { Reglages } from '../../partage/reglages';
 import type { DocumentIndexe, Mesure, Recherche, ResultatRecherche, Resume, Triage } from '../../partage/types';
-import { type Corpus, chercherPassages } from '../index/corpus';
+import { type Corpus, trouverCandidats } from '../index/corpus';
 import { ErreurMoteur, lireChoix, lireNote, lireOuiNon, type OptionsAppel } from '../moteurs/types';
 import { executerParLots } from '../outils/concurrence';
 import { decouperEnPassages } from '../texte/decoupage';
@@ -40,9 +40,9 @@ export async function trierDocument(
 }
 
 /**
- * Recherche en deux temps : l'index BM25 propose des passages, puis le moteur
- * de décision juge la pertinence de chacun ; le classement final suit cette
- * probabilité.
+ * Recherche en deux temps : l'index propose des passages (BM25, et en option
+ * la recherche sémantique), puis le moteur de décision juge la pertinence de
+ * chacun ; le classement final suit cette probabilité.
  */
 export async function rechercher(
   corpus: Corpus,
@@ -51,10 +51,14 @@ export async function rechercher(
   reglages: Reglages,
   options: OptionsAppel = {}
 ): Promise<Recherche> {
-  const candidats = chercherPassages(corpus, requete, reglages.recherche.candidats);
+  const trouves = await trouverCandidats(corpus, requete, reglages.recherche.candidats, {
+    semantique: reglages.semantique.active,
+    modele: reglages.semantique.modele,
+    ...(options.signal ? { signal: options.signal } : {})
+  });
   const noms = new Map(corpus.documents.map((d) => [d.id, d.nom]));
   const question = questionPertinence(requete);
-  const juges = await executerParLots(candidats, parallelisme(profil.decision.horsMachine, 4), async (candidat) => {
+  const juges = await executerParLots(trouves.candidats, parallelisme(profil.decision.horsMachine, 4), async (candidat) => {
     const documentNom = noms.get(candidat.passage.documentId) ?? candidat.passage.documentId;
     const { reponses, mesure } = await profil.decision.decider(
       { document: documentNom, passage: candidat.passage.texte },
@@ -64,21 +68,23 @@ export async function rechercher(
     const resultat: ResultatRecherche = {
       passage: candidat.passage,
       documentNom,
-      scoreLexical: candidat.score,
-      rangLexical: candidat.rang,
+      rangLexical: candidat.rangLexical,
+      rangSemantique: candidat.rangSemantique,
       pertinence: lireOuiNon(reponses, 'pertinence').probabiliteOui
     };
     return { resultat, mesure };
   });
 
-  const resultats = juges.map((j) => j.resultat);
-  resultats.sort((a, b) => (b.pertinence ?? 0) - (a.pertinence ?? 0) || a.rangLexical - b.rangLexical);
+  // Tri stable : à pertinence égale, l'ordre proposé par l'index départage.
+  const resultats = juges.map((j) => j.resultat).sort((a, b) => (b.pertinence ?? 0) - (a.pertinence ?? 0));
 
   return {
     requete,
     profil: profil.id,
+    modelePlongement: trouves.modelePlongement,
+    ...(trouves.avis ? { avis: trouves.avis } : {}),
     resultats: resultats.slice(0, reglages.recherche.resultats),
-    mesures: juges.map((j) => j.mesure)
+    mesures: [...trouves.mesures, ...juges.map((j) => j.mesure)]
   };
 }
 

@@ -38,7 +38,7 @@ interface JetonLogprob {
   top_logprobs?: Array<{ token: string; logprob: number }>;
 }
 
-interface ReponseChatOllama {
+export interface ReponseChatOllama {
   model?: string;
   message?: { content?: string };
   prompt_eval_count?: number;
@@ -56,9 +56,15 @@ export function estAdresseLocale(url: string): boolean {
   }
 }
 
-async function appelerOllama(options: OptionsOllama, corps: object, signal?: AbortSignal): Promise<ReponseChatOllama> {
+/** Requête POST à l'API d'Ollama, avec des erreurs lisibles (serveur éteint, modèle absent, délai dépassé). */
+export async function requeteOllama<T>(
+  options: OptionsOllama,
+  chemin: '/api/chat' | '/api/embed',
+  corps: object,
+  signal?: AbortSignal
+): Promise<T> {
   const delai = AbortSignal.timeout(options.delaiMs ?? 300_000);
-  const url = `${options.url.replace(/\/+$/, '')}/api/chat`;
+  const url = `${options.url.replace(/\/+$/, '')}${chemin}`;
   let reponse: Response;
   try {
     reponse = await (options.fetch ?? fetch)(url, {
@@ -87,7 +93,12 @@ async function appelerOllama(options: OptionsOllama, corps: object, signal?: Abo
     }
     throw new ErreurMoteur(`Erreur Ollama (${reponse.status}) : ${detail.slice(0, 300)}`);
   }
-  return JSON.parse(texte) as ReponseChatOllama;
+  return JSON.parse(texte) as T;
+}
+
+/** Appel à l'API de conversation d'Ollama (/api/chat), sans flux. */
+export function appelerOllama(options: OptionsOllama, corps: object, signal?: AbortSignal): Promise<ReponseChatOllama> {
+  return requeteOllama<ReponseChatOllama>(options, '/api/chat', corps, signal);
 }
 
 interface Candidat {

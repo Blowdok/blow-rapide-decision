@@ -36,6 +36,8 @@ export interface DocumentIndexe {
   modifieLe: string;
   texte: string;
   passages: Passage[];
+  /** Pages lues par OCR (option) ; absent si tout le texte vient du fichier. */
+  pagesOcr?: number;
 }
 
 export interface ErreurIndexation {
@@ -101,8 +103,11 @@ export type Reponse = ReponseOuiNon | ReponseChoix | ReponseNote;
 // Mesures : ce que coûte chaque appel à un moteur
 // ---------------------------------------------------------------------------
 
+/** Opérations mesurées : décider, rédiger, et pour les options, plonger (vecteurs) et lire par OCR. */
+export type Operation = 'decision' | 'redaction' | 'plongement' | 'ocr';
+
 export interface Mesure {
-  operation: 'decision' | 'redaction';
+  operation: Operation;
   /** Nom lisible du moteur, par exemple « Jev via OpenRouter ». */
   moteur: string;
   modele: string;
@@ -151,9 +156,10 @@ export interface Triage {
 export interface ResultatRecherche {
   passage: Passage;
   documentNom: string;
-  scoreLexical: number;
-  /** Rang dans le classement lexical seul, à partir de 1. */
-  rangLexical: number;
+  /** Rang dans le classement lexical (BM25), à partir de 1 ; `null` si seule la recherche sémantique l'a proposé. */
+  rangLexical: number | null;
+  /** Rang dans le classement sémantique, à partir de 1 ; `null` sans recherche sémantique. */
+  rangSemantique: number | null;
   /** Probabilité de pertinence décidée par le moteur, ou `null` sans décision. */
   pertinence: number | null;
 }
@@ -161,6 +167,10 @@ export interface ResultatRecherche {
 export interface Recherche {
   requete: string;
   profil: IdProfil;
+  /** Modèle de plongement de la recherche sémantique, `null` si la recherche est restée lexicale. */
+  modelePlongement: string | null;
+  /** Pourquoi la recherche sémantique demandée n'a pas servi. */
+  avis?: string;
   resultats: ResultatRecherche[];
   mesures: Mesure[];
 }

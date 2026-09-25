@@ -14,7 +14,12 @@ Mise à jour : 25 septembre 2026. À lire au début de chaque session, à mettre
 - 25 septembre 2026, modèles choisis par Blowdok ([RAD 0003](decisions/0003-jev-decide-un-llm-redige.md)) : son PC ne fait pas bien tourner les modèles de 7B et plus.
   - Local : `qwen3.5:4b` pour décider et résumer.
   - Hybride : Jev pour décider, Qwen3.8 Flash (`qwen/qwen3.8-flash`) sur OpenRouter pour résumer, raisonnement désactivé.
-- Vérifications : typage, 110 tests unitaires et les 6 étapes du parcours de bout en bout de l'application passent.
+- 25 septembre 2026, à la demande de Blowdok (« implémente ses deux pistes en option, pas une obligation pour fonctionner »), deux options locales, désactivées par défaut ([RAD 0005](decisions/0005-options-semantique-et-ocr.md)) :
+  - recherche sémantique avec `embeddinggemma` (ou `nomic-embed-text-v2-moe`), fusionnée avec BM25 ;
+  - lecture des PDF scannés avec `minicpm-v4.6:1b`.
+
+  Sans leurs modèles, l'agent fonctionne comme avant ; un échec laisse un avis. L'indexation peut maintenant être annulée.
+- Vérifications : typage, 154 tests unitaires, les 7 étapes du parcours de bout en bout de l'application et les 4 étapes du parcours des options (face à un faux serveur Ollama) passent.
 - Aucun essai réel avec Ollama, OpenRouter ou Jev : l'environnement de construction n'avait ni serveur Ollama ni clé API. Seuls le mode référence et des réponses simulées au format documenté ont tourné.
 
 ## Prochaine action
@@ -24,7 +29,10 @@ Mise à jour : 25 septembre 2026. À lire au début de chaque session, à mettre
 3. Comparer les autres petits modèles locaux (`gemma3:4b`, `granite4.2:3b`, `gemma4:e2b`) en changeant le modèle dans Réglages puis en relançant la comparaison.
 4. Constituer un jeu d'évaluation de 20 à 50 vrais documents représentatifs, puis trancher local ou hybride avec le banc.
 5. Valider la tolérance de 5 points et les critères du banc ([RAD 0004](decisions/0004-banc-de-decision.md)).
-6. Pistes : recherche sémantique avec les modèles de plongement déjà installés (`embeddinggemma`, `nomic-embed-text-v2-moe`), lecture des PDF scannés avec `minicpm-v4.6:1b`.
+6. Essayer les options sur le PC de Blowdok ([RAD 0005](decisions/0005-options-semantique-et-ocr.md)) :
+   - cocher la recherche sémantique, réindexer, relancer la Comparaison et lire la ligne « Lexical et sémantique » du rapport ;
+   - comparer `embeddinggemma` et `nomic-embed-text-v2-moe` ;
+   - lire quelques vrais PDF scannés avec `minicpm-v4.6:1b` et juger la transcription en français.
 
 ## Décisions
 
@@ -32,3 +40,4 @@ Mise à jour : 25 septembre 2026. À lire au début de chaque session, à mettre
 - [RAD 0002 — Application de bureau Electron en TypeScript](decisions/0002-application-de-bureau-electron.md).
 - [RAD 0003 — Jev décide, un LLM rédige : modes local et hybride](decisions/0003-jev-decide-un-llm-redige.md).
 - [RAD 0004 — Un banc de décision tranche entre local et hybride](decisions/0004-banc-de-decision.md).
+- [RAD 0005 — Recherche sémantique et lecture des PDF scannés, en options locales](decisions/0005-options-semantique-et-ocr.md).

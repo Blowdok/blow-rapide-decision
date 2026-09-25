@@ -8,14 +8,15 @@ import type {
   ResultatClassement,
   ResultatProfil,
   ResultatRechercheBanc,
-  ResultatResumeBanc
+  ResultatResumeBanc,
+  SemantiqueBanc
 } from '../../partage/banc';
 import { TIRET } from '../../partage/format';
 import { PROFILS, type Reglages } from '../../partage/reglages';
 import type { DocumentIndexe, IdProfil, Mesure } from '../../partage/types';
 import { rechercher, resumerDocument, trierDocument } from '../agent/agent';
 import type { Profil } from '../agent/profils';
-import { chercherPassages, type Corpus } from '../index/corpus';
+import { chercherPassages, type Corpus, trouverCandidats } from '../index/corpus';
 import { depuis } from '../moteurs/types';
 import { executerParLots } from '../outils/concurrence';
 import { ErreurJeu } from './jeu';
@@ -204,6 +205,41 @@ async function executerProfil(id: IdProfil, jeu: JeuEvaluation, corpus: Corpus, 
   };
 }
 
+/**
+ * Classement par BM25 et recherche sémantique fusionnés, sans décision : ce
+ * que la recherche sémantique (option) apporte, indépendamment des modes.
+ */
+async function rechercheFusionnee(jeu: JeuEvaluation, corpus: Corpus, options: OptionsBanc): Promise<SemantiqueBanc> {
+  const semantique = corpus.semantique;
+  if (semantique?.etat !== 'pret') {
+    return {
+      modele: null,
+      avis: semantique?.etat === 'echec' ? semantique.message : 'index sémantique absent du corpus.',
+      recherche: []
+    };
+  }
+  const recherche = await executerParLots(jeu.recherche, 1, async (attente): Promise<ResultatRechercheBanc> => {
+    options.signal?.throwIfAborted();
+    const debut = performance.now();
+    const trouves = await trouverCandidats(corpus, attente.requete, options.reglages.recherche.resultats, {
+      semantique: true,
+      ...(options.signal ? { signal: options.signal } : {})
+    });
+    const documentsObtenus = uniques(trouves.candidats.map((c) => c.passage.documentId));
+    return {
+      requete: attente.requete,
+      pertinents: attente.pertinents,
+      // Repli sur BM25 seul : la requête compte comme une erreur de la recherche fusionnée.
+      ...(trouves.modelePlongement
+        ? { documentsObtenus, rangPertinent: rangDuPremierPertinent(documentsObtenus, attente.pertinents) }
+        : { documentsObtenus: [], rangPertinent: null, erreur: trouves.avis ?? 'Recherche sémantique indisponible.' }),
+      dureeMs: depuis(debut),
+      coutUsd: 0
+    };
+  });
+  return { modele: semantique.modele, recherche };
+}
+
 /** Fait passer le jeu à chaque profil demandé, puis établit la recommandation. */
 export async function executerBanc(jeu: JeuEvaluation, corpus: Corpus, options: OptionsBanc): Promise<ResultatBanc> {
   const { reglages } = options;
@@ -221,6 +257,7 @@ export async function executerBanc(jeu: JeuEvaluation, corpus: Corpus, options: 
       coutUsd: 0
     };
   });
+  const semantique = reglages.semantique.active ? await rechercheFusionnee(jeu, corpus, options) : undefined;
 
   const profils: ResultatProfil[] = [];
   // Les modes passent l'un après l'autre pour ne pas fausser les temps mesurés.
@@ -234,6 +271,7 @@ export async function executerBanc(jeu: JeuEvaluation, corpus: Corpus, options: 
     date: (options.maintenant?.() ?? new Date()).toISOString(),
     toleranceQualite: jeu.criteres.toleranceQualite,
     rechercheLexicale,
+    ...(semantique ? { semantique } : {}),
     profils,
     recommandation: recommander(profils, jeu.criteres.toleranceQualite, corpus.documents.length)
   };
