@@ -34,13 +34,13 @@ function Question({ id, titre, ouverte, children }: { id: string; titre: string;
 }
 
 export function EcranAide() {
-  const { etat, sujetAide, allerA } = useApplication();
+  const { etat, sujetAide, allerA, ecran } = useApplication();
   const sujet = sujetAide ?? 'debut';
 
   // Arrivée depuis un lien « Comment faire ? » : la question voulue s'affiche en haut.
   useEffect(() => {
-    document.getElementById(`aide-${sujet}`)?.scrollIntoView({ block: 'start' });
-  }, [sujet]);
+    if (ecran === 'aide' && sujetAide) document.getElementById(`aide-${sujetAide}`)?.scrollIntoView({ block: 'start' });
+  }, [ecran, sujetAide]);
 
   const modeleLocal = etat?.reglages.ollama.modeleDecision ?? 'qwen3.5:4b';
   const seuil = Math.round((etat?.reglages.classement.seuilConfiance ?? 0.6) * 100);

@@ -93,7 +93,11 @@ export async function requeteOllama<T>(
     }
     throw new ErreurMoteur(`Erreur Ollama (${reponse.status}) : ${detail.slice(0, 300)}`);
   }
-  return JSON.parse(texte) as T;
+  try {
+    return JSON.parse(texte) as T;
+  } catch (erreur) {
+    throw new ErreurMoteur(`Réponse illisible d’Ollama (${options.url}) : ${texte.slice(0, 120)}`, { cause: erreur });
+  }
 }
 
 /** Appel à l'API de conversation d'Ollama (/api/chat), sans flux. */

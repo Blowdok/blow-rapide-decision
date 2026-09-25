@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { PROFILS, type Theme, THEMES } from '../../partage/reglages';
 import type { IdProfil } from '../../partage/types';
 import { messageErreur } from './api';
@@ -100,6 +100,11 @@ function SelecteurTheme() {
 
 export function App() {
   const { erreurDemarrage, ecran, allerA } = useApplication();
+  const contenu = useRef<HTMLElement>(null);
+  // Chaque écran s'ouvre en haut ; l'aide fait ensuite défiler jusqu'à la question demandée.
+  useLayoutEffect(() => {
+    contenu.current?.scrollTo(0, 0);
+  }, [ecran]);
   return (
     <div className="application">
       <aside className="barre-laterale">
@@ -127,13 +132,24 @@ export function App() {
         <header className="entete">
           <SelecteurMode />
         </header>
-        <main className="contenu">
+        <main className="contenu" ref={contenu}>
           {erreurDemarrage && <Message type="erreur">{erreurDemarrage}</Message>}
-          {ecran === 'documents' && <EcranDocuments />}
-          {ecran === 'recherche' && <EcranRecherche />}
-          {ecran === 'comparaison' && <EcranComparaison />}
-          {ecran === 'reglages' && <EcranReglages />}
-          {ecran === 'aide' && <EcranAide />}
+          {/* Les écrans restent montés : une lecture, une comparaison ou des réglages en cours survivent au changement d'écran. */}
+          <div hidden={ecran !== 'documents'}>
+            <EcranDocuments />
+          </div>
+          <div hidden={ecran !== 'recherche'}>
+            <EcranRecherche />
+          </div>
+          <div hidden={ecran !== 'comparaison'}>
+            <EcranComparaison />
+          </div>
+          <div hidden={ecran !== 'reglages'}>
+            <EcranReglages />
+          </div>
+          <div hidden={ecran !== 'aide'}>
+            <EcranAide />
+          </div>
         </main>
       </div>
     </div>

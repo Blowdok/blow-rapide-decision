@@ -21,6 +21,9 @@ let application: ElectronApplication;
 let fenetre: Page;
 let donnees: string;
 
+/** Bouton du menu latéral : les écrans restent montés, et l'aide contient aussi des liens « Documents »… */
+const menu = (nom: RegExp) => fenetre.getByRole('navigation', { name: 'Écrans' }).getByRole('button', { name: nom });
+
 async function capturer(nom: string): Promise<void> {
   if (CAPTURES) await fenetre.screenshot({ path: join(CAPTURES, `${nom}.png`) });
 }
@@ -51,10 +54,11 @@ test.afterAll(async () => {
 test('accueille le débutant en trois étapes, en mode local par défaut', async () => {
   await expect(fenetre).toHaveTitle('Blow Rapide Décision');
   await expect(fenetre.getByRole('radio', { name: 'Local' })).toHaveAttribute('aria-checked', 'true');
-  await expect(fenetre.getByText('Tout reste sur ce PC')).toBeVisible();
+  await expect(fenetre.getByText('Tout reste sur ce PC', { exact: true })).toBeVisible();
   await expect(fenetre.getByRole('heading', { name: 'Bienvenue ! Trois étapes pour commencer' })).toBeVisible();
   // L'agent vérifie tout seul si le mode choisi peut fonctionner, et dit quoi faire sinon.
-  await expect(fenetre.locator('.preparation-verdict')).toContainText(/Prêt|À faire/);
+  // Les écrans restent montés : seul celui qui est affiché compte.
+  await expect(fenetre.locator('.preparation-verdict:visible')).toContainText(/Prêt|À faire/);
   await expect(fenetre.getByRole('button', { name: 'Vérifier à nouveau' })).toBeVisible();
   await expect(fenetre.getByRole('button', { name: 'Choisir un dossier…' })).toBeVisible();
   await capturer('01-accueil');
@@ -83,7 +87,7 @@ test('indexe la démo, trie et résume en mode référence', async () => {
 });
 
 test('cherche un passage, d’abord avec une question d’exemple', async () => {
-  await fenetre.getByRole('button', { name: /^Recherche/ }).click();
+  await menu(/^Recherche/).click();
   await fenetre.getByRole('button', { name: 'Combien coûte la maintenance du site ?' }).click();
   await expect(fenetre.getByRole('searchbox', { name: 'Requête' })).toHaveValue('Combien coûte la maintenance du site ?');
   await expect(fenetre.locator('.resultat').first()).toBeVisible();
@@ -95,7 +99,7 @@ test('cherche un passage, d’abord avec une question d’exemple', async () => 
 });
 
 test('compare les modes et explique pourquoi aucun mode IA n’a tourné', async () => {
-  await fenetre.getByRole('button', { name: /^Comparaison/ }).click();
+  await menu(/^Comparaison/).click();
   await expect(fenetre.getByRole('textbox', { name: 'Dossier des documents d’examen' })).toHaveValue(/jeux-evaluation[\\/]demo$/);
   await fenetre.getByRole('button', { name: 'Lancer la comparaison' }).click();
   await expect(fenetre.getByRole('heading', { name: 'Aucun mode IA n’a pu tourner' })).toBeVisible({ timeout: 60_000 });
@@ -105,10 +109,10 @@ test('compare les modes et explique pourquoi aucun mode IA n’a tourné', async
 });
 
 test('vérifie les services depuis les réglages, réglages avancés repliés', async () => {
-  await fenetre.getByRole('button', { name: /^Réglages/ }).click();
+  await menu(/^Réglages/).click();
   await fenetre.getByRole('button', { name: 'Vérifier à nouveau' }).click();
-  await expect(fenetre.locator('.diagnostic li')).toHaveCount(3);
-  await expect(fenetre.locator('.diagnostic')).toContainText('Clé absente : le mode hybride est indisponible.');
+  await expect(fenetre.locator('.diagnostic:visible li')).toHaveCount(3);
+  await expect(fenetre.locator('.diagnostic:visible')).toContainText('Clé absente : le mode hybride est indisponible.');
   // Le débutant ne voit que l'essentiel ; le reste attend une case à cocher.
   await expect(fenetre.getByRole('textbox', { name: 'Adresse du serveur' })).toHaveCount(0);
   await capturer('05-reglages');
@@ -128,12 +132,12 @@ test('garde les options facultatives désactivées, et avance sans leurs modèle
   await expect(fenetre.getByText('Réglages enregistrés.')).toBeVisible();
   await capturer('06-options');
 
-  await fenetre.getByRole('button', { name: /^Documents/ }).click();
+  await menu(/^Documents/).click();
   await fenetre.getByRole('button', { name: 'Actualiser' }).click();
   await expect(fenetre.getByText(/^Recherche sémantique indisponible : Ollama est injoignable/)).toBeVisible();
   await expect(fenetre.getByRole('row', { name: /facture-imprimerie-lumen\.txt/ })).toBeVisible();
 
-  await fenetre.getByRole('button', { name: /^Recherche/ }).click();
+  await menu(/^Recherche/).click();
   await fenetre.getByRole('searchbox', { name: 'Requête' }).fill('date limite pour payer la taxe foncière');
   await fenetre.getByRole('button', { name: 'Chercher' }).click();
   await expect(fenetre.locator('.resultat').first()).toContainText('avis-taxe-fonciere-2026.txt');
@@ -162,13 +166,13 @@ test('bascule le thème : sombre, clair, puis système', async () => {
     fenetre.evaluate(async () => (await (globalThis as unknown as { brd: ApiBureau }).brd.reglages.lire()).reglages.apparence.theme);
   const theme = fenetre.getByRole('radiogroup', { name: 'Thème' });
 
-  await fenetre.getByRole('button', { name: /^Documents/ }).click();
+  await menu(/^Documents/).click();
   await theme.getByRole('radio', { name: 'Sombre' }).click();
   await expect(theme.getByRole('radio', { name: 'Sombre' })).toHaveAttribute('aria-checked', 'true');
   await expect.poll(sombre).toBe(true);
   expect(await themeEnregistre()).toBe('sombre');
   await capturer('08-documents-sombre');
-  await fenetre.getByRole('button', { name: /^Comparaison/ }).click();
+  await menu(/^Comparaison/).click();
   await capturer('09-comparaison-sombre');
 
   await theme.getByRole('radio', { name: 'Clair' }).click();

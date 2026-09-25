@@ -25,6 +25,9 @@ let serveur: Server;
 /** Délai de lecture d'une page par le faux modèle de vision. */
 let lenteurOcrMs = 0;
 
+/** Bouton du menu latéral : les écrans restent montés, et l'aide contient aussi des liens « Documents »… */
+const menu = (nom: RegExp) => fenetre.getByRole('navigation', { name: 'Écrans' }).getByRole('button', { name: nom });
+
 async function capturer(nom: string): Promise<void> {
   if (CAPTURES) await fenetre.screenshot({ path: join(CAPTURES, `${nom}.png`) });
 }
@@ -108,7 +111,7 @@ test('lit le PDF scanné par OCR et prépare la recherche sémantique', async ()
 });
 
 test('trouve un document par le sens, sans mot commun', async () => {
-  await fenetre.getByRole('button', { name: /^Recherche/ }).click();
+  await menu(/^Recherche/).click();
   await expect(fenetre.getByText('La recherche comprend aussi les mots de sens proche (option activée).')).toBeVisible();
   await fenetre.getByRole('searchbox', { name: 'Requête' }).fill('rémunération');
   await fenetre.getByRole('button', { name: 'Chercher' }).click();
@@ -119,7 +122,7 @@ test('trouve un document par le sens, sans mot commun', async () => {
 });
 
 test('affiche les options actives dans les réglages', async () => {
-  await fenetre.getByRole('button', { name: /^Réglages/ }).click();
+  await menu(/^Réglages/).click();
   const options = fenetre.getByRole('region', { name: 'Options locales facultatives' });
   await expect(options.getByRole('checkbox', { name: /Recherche par le sens/ })).toBeChecked();
   await expect(options.getByRole('checkbox', { name: /Lecture des PDF scannés/ })).toBeChecked();
@@ -129,11 +132,16 @@ test('affiche les options actives dans les réglages', async () => {
   await capturer('options-03-reglages');
 });
 
-test('annule une lecture OCR trop longue et garde le dossier ouvert', async () => {
+test('annule une lecture OCR trop longue, même après un détour par l’aide', async () => {
   lenteurOcrMs = 60_000;
   await writeFile(join(documents, 'releve-scanne.pdf'), creerPdfPages([{ image: imageScannee(500, 700) }]));
-  await fenetre.getByRole('button', { name: /^Documents/ }).click();
+  await menu(/^Documents/).click();
   await fenetre.getByRole('button', { name: 'Actualiser' }).click();
+  await expect(fenetre.getByText('Lecture OCR de releve-scanne.pdf : page 1 sur 1')).toBeVisible();
+  // La lecture continue pendant la visite d'un autre écran ; au retour, son bouton Annuler attend toujours.
+  await menu(/^Aide/).click();
+  await expect(fenetre.getByRole('heading', { name: 'Aide', exact: true })).toBeVisible();
+  await menu(/^Documents/).click();
   await expect(fenetre.getByText('Lecture OCR de releve-scanne.pdf : page 1 sur 1')).toBeVisible();
   await capturer('options-04-lecture-ocr');
   await fenetre.getByRole('button', { name: 'Annuler', exact: true }).click();

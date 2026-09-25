@@ -109,9 +109,10 @@ export function passagesDuDocument(documentId: string, texte: string, taillePass
   }));
 }
 
-/** Clé d'un vecteur en mémoire : même modèle et même texte donnent le même vecteur. */
-function cleVecteur(modele: string, texte: TexteAPlonger): string {
-  return createHash('sha256').update(`${modele}\n${textePourModele(modele, 'document', texte)}`).digest('hex');
+/** Clé d'un vecteur en mémoire : même serveur, même modèle et même texte donnent le même vecteur. */
+function cleVecteur(moteur: MoteurPlongement, texte: TexteAPlonger): string {
+  const { modele, origine = '' } = moteur;
+  return createHash('sha256').update(`${origine}\n${modele}\n${textePourModele(modele, 'document', texte)}`).digest('hex');
 }
 
 /**
@@ -126,7 +127,7 @@ export async function ajouterSemantique(
   const elements = corpus.documents.flatMap((document) =>
     document.passages.map((passage) => ({ passage, texte: { texte: passage.texte, titre: titreDuDocument(document) } }))
   );
-  const cles = elements.map((e) => cleVecteur(moteur.modele, e.texte));
+  const cles = elements.map((e) => cleVecteur(moteur, e.texte));
   const memoire = options.memoirePlongements;
   const manquants = elements.flatMap((_, i) => (memoire?.has(cles[i] as string) ? [] : [i]));
   const dejaCalcules = elements.length - manquants.length;
@@ -174,6 +175,12 @@ export function raisonSansTexte(format: FormatDocument, extraction: Extraction, 
   if (format !== 'pdf' || extraction.pagesSansTexte === 0) return 'Aucun texte extrait : document vide.';
   if (!ocrDemande) return 'Aucun texte extrait : PDF scanné ou vide. L’option de lecture des PDF scannés peut le lire.';
   if (panneOcr) return `Aucun texte extrait : lecture OCR impossible. ${finPhrase(panneOcr)}`;
+  if (extraction.pagesAuDela) {
+    return (
+      `Aucun texte extrait des pages lues par OCR ; ${extraction.pagesAuDela} autre(s) page(s) sans texte n’ont pas été ` +
+      'examinées : augmentez la limite de pages dans les réglages avancés.'
+    );
+  }
   return 'Aucun texte extrait, même par lecture OCR : pages blanches ou images illisibles.';
 }
 
@@ -217,7 +224,7 @@ export async function indexerDossier(dossier: string, options: OptionsIndexation
       }
       if (extraction.pagesAuDela && options.ocr) {
         avis.push(
-          `${id} : ${extraction.pagesAuDela} page(s) scannée(s) non lue(s), au-delà de la limite de ${options.ocr.pagesMax} pages par document.`
+          `${id} : ${extraction.pagesAuDela} page(s) sans texte non examinée(s), au-delà de la limite de ${options.ocr.pagesMax} pages lues par document.`
         );
       }
       documents.push({
@@ -320,14 +327,16 @@ export async function trouverCandidats(
   }
 
   let plongement: ResultatPlongement;
+  let semantiques: Passage[];
   try {
     plongement = await semantique.moteur.plonger([{ texte: requete }], 'requete', options.signal ? { signal: options.signal } : {});
+    const [vecteur] = plongement.vecteurs;
+    // Un modèle remplacé sous le même nom change la taille des vecteurs : l'index lève alors une erreur.
+    semantiques = vecteur ? semantique.index.chercher(vecteur, PROFONDEUR_FUSION).map((r) => r.element) : [];
   } catch (erreur) {
     if (options.signal?.aborted) throw erreur;
     return seulementLexical(`Recherche sémantique indisponible : ${finPhrase((erreur as Error).message)} Recherche par mots-clés seule.`);
   }
-  const [vecteur] = plongement.vecteurs;
-  const semantiques = vecteur ? semantique.index.chercher(vecteur, PROFONDEUR_FUSION).map((r) => r.element) : [];
 
   const rangs = (passages: Passage[]): Map<string, number> => new Map(passages.map((p, i) => [p.id, i + 1]));
   const rangsLexicaux = rangs(lexicaux);

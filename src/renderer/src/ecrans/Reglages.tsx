@@ -129,7 +129,7 @@ function EditeurCategories({ categories, changer }: { categories: Categorie[]; c
 }
 
 export function EcranReglages() {
-  const { etat, enregistrerReglages, allerA } = useApplication();
+  const { etat, enregistrerReglages, allerA, ecran } = useApplication();
   const [brouillon, definirBrouillon] = useState<Reglages | null>(null);
   const [modeles, definirModeles] = useState<string[]>([]);
   const [journal, definirJournal] = useState<EntreeJournal[]>([]);
@@ -145,9 +145,10 @@ export function EcranReglages() {
     );
   }, [etat]);
 
+  // Le journal est relu à chaque retour sur l'écran : de nouveaux envois ont pu avoir lieu.
   useEffect(() => {
-    void api.journal().then(definirJournal);
-  }, []);
+    if (ecran === 'reglages') void api.journal().then(definirJournal);
+  }, [ecran]);
 
   const lireModeles = useCallback(() => {
     api.services.modelesOllama().then(definirModeles, () => definirModeles([]));
@@ -199,7 +200,7 @@ export function EcranReglages() {
 
       <section className="carte">
         <h2>L’agent est-il prêt ?</h2>
-        <EtatPreparation apresVerification={lireModeles} />
+        <EtatPreparation actif={ecran === 'reglages'} apresVerification={lireModeles} />
       </section>
 
       <section className="carte">

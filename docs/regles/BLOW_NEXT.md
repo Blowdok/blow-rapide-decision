@@ -23,7 +23,14 @@ Mise à jour : 25 septembre 2026. À lire au début de chaque session, à mettre
   - un accueil en trois étapes vérifie que l'agent est prêt ;
   - un écran Aide répond aux questions courantes ;
   - le vocabulaire est simplifié (« Classer », « Actualiser ») et les réglages techniques sont repliés.
-- Vérifications : typage, 154 tests unitaires, les 8 étapes du parcours de bout en bout de l'application et les 4 étapes du parcours des options (face à un faux serveur Ollama) passent.
+- 25 septembre 2026, une relecture critique des options a relevé six défauts, tous corrigés :
+  - mémoire de la lecture OCR ;
+  - cache fragile ;
+  - bouton Annuler perdu après un changement d'écran ;
+  - scans en bandes, en masques ou tournés mal lus ;
+  - repli de la recherche sémantique ;
+  - limite de pages consommée par les pages blanches.
+- Vérifications : typage, 165 tests unitaires, les 8 étapes du parcours de bout en bout de l'application et les 4 étapes du parcours des options (face à un faux serveur Ollama) passent.
 - Blowdok a demandé la fusion dans `main` une fois ce travail terminé (PR #1).
 - Aucun essai réel avec Ollama, OpenRouter ou Jev : l'environnement de construction n'avait ni serveur Ollama ni clé API. Seuls le mode référence et des réponses simulées au format documenté ont tourné.
 

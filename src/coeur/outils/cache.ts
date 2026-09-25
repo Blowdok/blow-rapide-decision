@@ -1,7 +1,7 @@
 // Cache de textes par clé : évite de relire par OCR une page déjà lue.
 // En mémoire pour la ligne de commande et les tests, sur disque pour l'application.
 
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -49,8 +49,9 @@ export class CacheFichiers implements CacheTexte {
   async ecrire(cle: string, texte: string): Promise<void> {
     await mkdir(this.#dossier, { recursive: true });
     const chemin = this.#chemin(cle);
-    // Écriture puis renommage : une coupure ne laisse pas d'entrée tronquée.
-    const provisoire = `${chemin}.${process.pid}.tmp`;
+    // Écriture puis renommage : une coupure ne laisse pas d'entrée tronquée. Nom provisoire
+    // unique : deux écritures simultanées de la même clé ne se marchent pas dessus.
+    const provisoire = `${chemin}.${randomUUID()}.tmp`;
     await writeFile(provisoire, texte, 'utf8');
     await rename(provisoire, chemin);
   }
