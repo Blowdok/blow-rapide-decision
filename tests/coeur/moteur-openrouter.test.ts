@@ -6,7 +6,7 @@ const MESSAGE = { systeme: 'Sois fidèle.', utilisateur: 'Résume ce devis.', so
 
 function reponseChat(contenu: string): Response {
   return reponseJson({
-    model: 'anthropic/claude-sonnet-5',
+    model: 'fournisseur/modele-resolu',
     choices: [{ message: { role: 'assistant', content: contenu }, finish_reason: 'stop' }],
     usage: { prompt_tokens: 1200, completion_tokens: 150, total_tokens: 1350, cost: 0.00585 }
   });
@@ -33,7 +33,7 @@ describe('moteur de rédaction OpenRouter', () => {
     expect((appels[0]?.corps as { provider: object }).provider).not.toHaveProperty('zdr');
     expect(mesure).toMatchObject({
       moteur: 'OpenRouter',
-      modele: 'anthropic/claude-sonnet-5',
+      modele: 'fournisseur/modele-resolu',
       jetonsEntree: 1200,
       jetonsSortie: 150,
       coutUsd: 0.00585,
