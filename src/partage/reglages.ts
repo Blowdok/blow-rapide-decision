@@ -76,8 +76,9 @@ export const CATEGORIES_PAR_DEFAUT: Categorie[] = [
 export const REGLAGES_PAR_DEFAUT: Reglages = {
   profil: 'local',
   apparence: { theme: 'systeme' },
-  ollama: { url: 'http://127.0.0.1:11434', modeleDecision: 'qwen3:8b', modeleResume: 'qwen3:8b', contexte: 8192 },
-  openrouter: { modeleResume: '~anthropic/claude-sonnet-latest', refuserCollecte: true, exigerZdr: false },
+  // Un seul petit modèle local pour décider et résumer : un seul chargement en mémoire.
+  ollama: { url: 'http://127.0.0.1:11434', modeleDecision: 'qwen3.5:4b', modeleResume: 'qwen3.5:4b', contexte: 8192 },
+  openrouter: { modeleResume: 'qwen/qwen3.8-flash', refuserCollecte: true, exigerZdr: false },
   jev: { acces: 'openrouter', modele: 'jev-latest' },
   confidentialite: { masquage: true },
   classement: { categories: CATEGORIES_PAR_DEFAUT, seuilConfiance: 0.6, caracteresMax: 6000 },

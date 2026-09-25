@@ -8,7 +8,8 @@ Au 25 septembre 2026 ([RAD 0002](docs/regles/decisions/0002-application-de-burea
 
 - Application de bureau **Electron 44**, construite par **electron-vite 5** (Vite 7), interface **React 19**, **TypeScript 7**.
 - **Jev** (TypeSafe AI) pour les décisions en mode hybride, par le SDK officiel `@typesafe-ai/sdk`, via **OpenRouter**.
-- **Ollama** pour le mode local ; **OpenRouter** pour les résumés en mode hybride.
+- **Ollama** pour le mode local, avec `qwen3.5:4b` par défaut pour décider et résumer.
+- **OpenRouter** pour les résumés en mode hybride, avec Qwen3.8 Flash (`qwen/qwen3.8-flash`), raisonnement désactivé.
 - Extraction locale : `unpdf` (PDF), `mammoth` (Word).
 - Tests : **Vitest 5** et **Playwright** (parcours de l'application réelle).
 
@@ -39,13 +40,17 @@ npm install
 
 Au premier lancement, Electron télécharge son binaire.
 
-**Mode local** : installer [Ollama](https://ollama.com) (0.12.11 ou plus récent, pour les probabilités des décisions), puis le modèle par défaut :
+**Mode local** : installer [Ollama](https://ollama.com) (0.12.11 ou plus récent, pour les probabilités des décisions), puis le modèle par défaut, s'il n'est pas déjà là :
 
 ```bash
-ollama pull qwen3:8b
+ollama pull qwen3.5:4b
 ```
 
+Le modèle par défaut vise un PC modeste. D'autres petits modèles se choisissent dans Réglages : `gemma3:4b`, `granite4.2:3b`, `gemma4:e2b`… La Comparaison mesure l'effet du changement.
+
 **Mode hybride** : créer une clé OpenRouter, puis l'enregistrer dans l'écran Réglages de l'application (elle y est chiffrée par le système). Pour la ligne de commande, copier `.env.exemple` en `.env` et renseigner `OPENROUTER_API_KEY`.
+
+Qwen3.8 Flash n'a qu'un fournisseur sur OpenRouter. Si les résumés échouent avec un message sur la confidentialité, ce fournisseur est exclu par le refus de collecte. Il faut alors décocher ce réglage ou choisir un autre modèle.
 
 ## Exemples d'utilisation
 

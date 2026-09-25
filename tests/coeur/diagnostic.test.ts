@@ -24,7 +24,7 @@ function services(options: { ollama?: string[] | 'eteint'; cle?: 'valide' | 'ref
 
 describe('diagnostic', () => {
   it('confirme un poste prêt pour les deux modes', async () => {
-    const { fetch } = services({ ollama: ['qwen3:8b', 'gemma3:4b'], cle: 'valide' });
+    const { fetch } = services({ ollama: ['qwen3.5:4b', 'gemma3:4b'], cle: 'valide' });
     const etats = await diagnostiquer(REGLAGES_PAR_DEFAUT, { cleOpenRouter: 'k' }, fetch);
     expect(etats.map((e) => [e.service, e.ok])).toEqual([
       ['Ollama', true],
@@ -37,7 +37,7 @@ describe('diagnostic', () => {
   it('indique la commande pour installer un modèle manquant', async () => {
     const { fetch } = services({ ollama: ['gemma3:4b'] });
     const [ollama] = await diagnostiquer(REGLAGES_PAR_DEFAUT, {}, fetch);
-    expect(ollama).toEqual({ service: 'Ollama', ok: false, detail: 'Modèle absent : lancez « ollama pull qwen3:8b ».' });
+    expect(ollama).toEqual({ service: 'Ollama', ok: false, detail: 'Modèle absent : lancez « ollama pull qwen3.5:4b ».' });
   });
 
   it('accepte un modèle installé sous l’étiquette « latest »', async () => {
@@ -57,7 +57,7 @@ describe('diagnostic', () => {
 
   it('vérifie l’accès direct à Jev chez TypeSafe', async () => {
     const reglages = fusionnerReglages(REGLAGES_PAR_DEFAUT, { jev: { acces: 'typesafe' } });
-    const { fetch } = services({ ollama: ['qwen3:8b'], cle: 'refusee', jev: ['jev-1.13'] });
+    const { fetch } = services({ ollama: ['qwen3.5:4b'], cle: 'refusee', jev: ['jev-1.13'] });
     const etats = await diagnostiquer(reglages, { cleOpenRouter: 'k', cleTypeSafe: 't' }, fetch);
     expect(etats[1]).toMatchObject({ ok: false, detail: expect.stringMatching(/401/) });
     expect(etats[2]).toEqual({ service: 'Jev', ok: true, detail: 'Accès direct TypeSafe valide, modèles : jev-1.13.' });

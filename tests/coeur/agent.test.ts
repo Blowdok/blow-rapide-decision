@@ -168,7 +168,8 @@ describe('profils', () => {
   it('le mode local pilote Ollama avec les modèles réglés', () => {
     const profil = creerProfil('local', { reglages: REGLAGES_PAR_DEFAUT, secrets: {} });
     expect(profil.decision.nom).toBe('Ollama');
-    expect(profil.decision.modele).toBe('qwen3:8b');
+    expect(profil.decision.modele).toBe('qwen3.5:4b');
+    expect(profil.redaction.modele).toBe('qwen3.5:4b');
     expect(profil.decision.horsMachine).toBe(false);
   });
 
@@ -179,7 +180,7 @@ describe('profils', () => {
   it('le mode hybride associe Jev et OpenRouter', () => {
     const profil = creerProfil('hybride', { reglages: REGLAGES_PAR_DEFAUT, secrets: { cleOpenRouter: 'k' } });
     expect(profil.decision.nom).toBe('Jev via OpenRouter');
-    expect(profil.redaction.modele).toBe('~anthropic/claude-sonnet-latest');
+    expect(profil.redaction.modele).toBe('qwen/qwen3.8-flash');
     expect(profil.decision.horsMachine && profil.redaction.horsMachine).toBe(true);
   });
 
