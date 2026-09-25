@@ -19,11 +19,12 @@ export function BarreProgression({ fait, total, libelle }: { fait: number; total
   );
 }
 
-/** Probabilité sous forme de jauge horizontale. */
-export function Jauge({ valeur, libelle }: { valeur: number; libelle?: string }) {
+/** Probabilité sous forme de jauge horizontale ; `aide` dit ce qu'elle mesure. */
+export function Jauge({ valeur, libelle, aide }: { valeur: number; libelle?: string; aide?: string }) {
   const niveau = valeur >= 0.75 ? 'haute' : valeur >= 0.5 ? 'moyenne' : 'basse';
+  const pourcentage = formaterPourcentage(valeur);
   return (
-    <div className="jauge" title={formaterPourcentage(valeur)}>
+    <div className="jauge" data-infobulle={aide ? `${aide} : ${pourcentage}.` : `${libelle ?? 'Probabilité'} : ${pourcentage} selon l’agent.`}>
       {libelle && <span className="jauge-libelle">{libelle}</span>}
       <span className="jauge-piste">
         <span className={`jauge-valeur jauge-${niveau}`} style={{ width: `${Math.round(valeur * 100)}%` }} />
@@ -58,7 +59,12 @@ export function MessageErreur({ message }: { message: string }) {
       {sujet && (
         <>
           {' '}
-          <button type="button" className="lien" onClick={() => allerA('aide', sujet)}>
+          <button
+            type="button"
+            className="lien"
+            onClick={() => allerA('aide', sujet)}
+            data-infobulle="Ouvre l’aide qui explique comment régler ce problème."
+          >
             Comment faire ?
           </button>
         </>
@@ -67,8 +73,21 @@ export function MessageErreur({ message }: { message: string }) {
   );
 }
 
-export function Pastille({ ton, children }: { ton: 'neutre' | 'accent' | 'succes' | 'alerte' | 'danger'; children: ReactNode }) {
-  return <span className={`pastille pastille-${ton}`}>{children}</span>;
+export function Pastille({
+  ton,
+  infobulle,
+  children
+}: {
+  ton: 'neutre' | 'accent' | 'succes' | 'alerte' | 'danger';
+  /** Ce que signifie la pastille, affiché au survol. */
+  infobulle?: string;
+  children: ReactNode;
+}) {
+  return (
+    <span className={`pastille pastille-${ton}`} {...(infobulle ? { 'data-infobulle': infobulle } : {})}>
+      {children}
+    </span>
+  );
 }
 
 /** Bilan d'une opération, en clair : qui l'a faite, en combien de temps, pour quel coût, et ce qui a quitté le PC. */
@@ -80,7 +99,10 @@ export function BilanMesures({ mesures }: { mesures: Mesure[] }) {
   const masques = distantes.reduce((s, m) => s + m.elementsMasques, 0);
   const moteurs = [...new Set(mesures.map((m) => `${m.moteur} (${m.modele})`))].join(', ');
   return (
-    <p className="bilan">
+    <p
+      className="bilan"
+      data-infobulle="Qui a fait ce travail, en combien de temps, pour quel coût, et ce qui a quitté ce PC. Le détail des envois est dans Réglages, rubrique Confidentialité."
+    >
       Fait par {moteurs} en {formaterDuree(duree)} · {cout > 0 ? `coût ${formaterUsd(cout)}` : 'gratuit'} ·{' '}
       {distantes.length
         ? `${formaterEntier(envoyes)} caractères envoyés sur Internet, ${formaterEntier(masques)} données personnelles masquées`
@@ -100,8 +122,8 @@ export function Urgence({ note }: { note: number }) {
   const niveau = Math.min(2, Math.max(0, Math.round(note)));
   const ton = (['neutre', 'alerte', 'danger'] as const)[niveau] ?? 'neutre';
   return (
-    <span title={AIDES_URGENCE[niveau]}>
-      <Pastille ton={ton}>{libelleUrgence(note)}</Pastille>
-    </span>
+    <Pastille ton={ton} infobulle={`Urgence : ${AIDES_URGENCE[niveau]?.toLowerCase() ?? ''}.`}>
+      {libelleUrgence(note)}
+    </Pastille>
   );
 }

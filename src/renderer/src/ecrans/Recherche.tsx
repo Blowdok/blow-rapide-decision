@@ -13,24 +13,32 @@ function surligner(texte: string, requete: string): ReactNode[] {
   const racines = new Set(termes(requete));
   return texte.split(/([\p{L}\p{N}]+)/u).map((morceau, i) => {
     const [racine] = termes(morceau);
-    return racine && racines.has(racine) ? <mark key={i}>{morceau}</mark> : morceau;
+    return racine && racines.has(racine) ? (
+      <mark key={i} data-infobulle="Surligné : un mot de votre question.">
+        {morceau}
+      </mark>
+    ) : (
+      morceau
+    );
   });
 }
 
-/** Comment l'index a trouvé le passage, en clair ; les rangs exacts restent dans l'infobulle. */
+/** Comment l'index a trouvé le passage, en clair ; les rangs exacts sont dans la bulle. */
 function Provenance({ resultat }: { resultat: ResultatRecherche }) {
   const { rangLexical, rangSemantique } = resultat;
-  const libelle =
+  const [libelle, explication] =
     rangLexical !== null && rangSemantique !== null
-      ? 'Trouvé par les mots et par le sens'
+      ? [
+          'Trouvé par les mots et par le sens',
+          `Ce passage reprend des mots de la question (rang ${rangLexical}) et en parle aussi par le sens (rang ${rangSemantique}).`
+        ]
       : rangSemantique !== null
-        ? 'Trouvé par le sens'
-        : 'Trouvé par les mots';
-  const detail = `Rang par les mots : ${rangLexical ?? '–'} ; rang par le sens : ${rangSemantique ?? '–'}`;
+        ? ['Trouvé par le sens', `Ce passage ne reprend pas les mots de la question, mais il en parle (rang ${rangSemantique} par le sens).`]
+        : ['Trouvé par les mots', `Ce passage reprend des mots de la question (rang ${rangLexical ?? '–'}).`];
   return (
-    <span title={detail}>
-      <Pastille ton="neutre">{libelle}</Pastille>
-    </span>
+    <Pastille ton="neutre" infobulle={explication}>
+      {libelle}
+    </Pastille>
   );
 }
 
@@ -77,7 +85,12 @@ export function EcranRecherche() {
       {!corpus ? (
         <Message type="info">
           Choisissez d’abord un dossier de documents.{' '}
-          <button type="button" className="lien" onClick={() => allerA('documents')}>
+          <button
+            type="button"
+            className="lien"
+            onClick={() => allerA('documents')}
+            data-infobulle="Ouvre l’écran Documents pour choisir le dossier où chercher."
+          >
             Aller à l’écran Documents
           </button>
         </Message>
@@ -94,8 +107,18 @@ export function EcranRecherche() {
               onChange={(e) => definirRequete(e.target.value)}
               placeholder="Par exemple : quand dois-je payer la taxe foncière ?"
               aria-label="Requête"
+              data-infobulle="Tapez votre question en français, puis Entrée ou « Chercher »."
             />
-            <button type="submit" className="principal" disabled={enCours || !requete.trim()}>
+            <button
+              type="submit"
+              className="principal"
+              disabled={enCours || !requete.trim()}
+              data-infobulle={
+                requete.trim()
+                  ? 'Cherche, dans les documents du dossier ouvert, les passages qui répondent à la question.'
+                  : 'Tapez d’abord une question dans le champ.'
+              }
+            >
               {enCours ? 'Recherche…' : 'Chercher'}
             </button>
           </form>
@@ -103,7 +126,13 @@ export function EcranRecherche() {
             <div className="exemples">
               <span className="indice">Exemples :</span>
               {EXEMPLES.map((exemple) => (
-                <button key={exemple} type="button" className="exemple" onClick={() => essayer(exemple)}>
+                <button
+                  key={exemple}
+                  type="button"
+                  className="exemple"
+                  onClick={() => essayer(exemple)}
+                  data-infobulle="Lance cette question d’exemple sur vos documents."
+                >
                   {exemple}
                 </button>
               ))}
@@ -127,11 +156,22 @@ export function EcranRecherche() {
                     <div className="resultat-entete">
                       <strong>{r.documentNom}</strong>
                       {resultat.modelePlongement !== null && <Provenance resultat={r} />}
-                      <button type="button" className="lien" onClick={() => void api.documents.ouvrir(r.passage.documentId)}>
+                      <button
+                        type="button"
+                        className="lien"
+                        onClick={() => void api.documents.ouvrir(r.passage.documentId)}
+                        data-infobulle="Ouvre le document avec le logiciel habituel de ce PC."
+                      >
                         Ouvrir le fichier
                       </button>
                     </div>
-                    {r.pertinence !== null && <Jauge valeur={r.pertinence} libelle="Répond à la question" />}
+                    {r.pertinence !== null && (
+                      <Jauge
+                        valeur={r.pertinence}
+                        libelle="Répond à la question"
+                        aide="Probabilité que ce passage réponde à la question, selon le mode choisi"
+                      />
+                    )}
                     <p className="passage">{surligner(r.passage.texte.slice(0, 600), resultat.requete)}</p>
                   </li>
                 ))}

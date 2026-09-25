@@ -14,12 +14,15 @@ import { finPhrase, formaterDuree, formaterEntier, formaterNombre, formaterPourc
 export interface LigneSynthese {
   libelle: string;
   valeurs: string[];
+  /** Ce que mesure le critère, en langage simple (bulle d'information). */
+  aide: string;
   /** Ligne à mettre en avant (indice de qualité). */
   importante?: boolean;
 }
 
 interface DefinitionLigne {
   libelle: string;
+  aide: string;
   valeur: (m: MetriquesProfil, p: ResultatProfil) => string;
   /** Affichée même pour un mode non terminé. */
   toujours?: boolean;
@@ -27,38 +30,111 @@ interface DefinitionLigne {
 }
 
 const LIGNES: DefinitionLigne[] = [
-  { libelle: 'Statut', valeur: (_m, p) => LIBELLES_STATUT[p.statut], toujours: true },
-  { libelle: 'Moteur de décision', valeur: (_m, p) => p.moteurs.decision, toujours: true },
-  { libelle: 'Moteur de rédaction', valeur: (_m, p) => p.moteurs.redaction, toujours: true },
+  {
+    libelle: 'Statut',
+    aide: 'Terminé ; interrompu après trop d’échecs d’affilée ; ou indisponible, faute de clé ou de serveur.',
+    valeur: (_m, p) => LIBELLES_STATUT[p.statut],
+    toujours: true
+  },
+  {
+    libelle: 'Moteur de décision',
+    aide: 'Ce qui classe les documents et juge si un passage répond à la question.',
+    valeur: (_m, p) => p.moteurs.decision,
+    toujours: true
+  },
+  { libelle: 'Moteur de rédaction', aide: 'Ce qui écrit les résumés.', valeur: (_m, p) => p.moteurs.redaction, toujours: true },
   {
     libelle: 'Indice de qualité',
+    aide: 'Note sur 100 : moyenne de la justesse du classement, de la recherche et des résumés. Une erreur compte comme une réponse fausse.',
     valeur: (m) => (m.qualite === null ? TIRET : `${formaterNombre(m.qualite)}/100`),
     importante: true
   },
-  { libelle: 'Catégorie juste', valeur: (m) => formaterPourcentage(m.classement.categorie) },
-  { libelle: 'Action requise juste', valeur: (m) => formaterPourcentage(m.classement.action) },
-  { libelle: 'Urgence juste', valeur: (m) => formaterPourcentage(m.classement.urgence) },
-  { libelle: 'Documents « à vérifier »', valeur: (m) => formaterPourcentage(m.classement.aVerifier) },
-  { libelle: 'Catégorie juste quand l’agent est sûr', valeur: (m) => formaterPourcentage(m.classement.categorieSiSur) },
-  { libelle: 'Recherche : pertinent en tête', valeur: (m) => formaterPourcentage(m.recherche.enTete) },
-  { libelle: 'Recherche : pertinent dans les 3 premiers', valeur: (m) => formaterPourcentage(m.recherche.dansTop3) },
-  { libelle: 'Recherche : rang réciproque moyen', valeur: (m) => formaterNombre(m.recherche.mrr, 2) },
-  { libelle: 'Résumés : faits couverts', valeur: (m) => formaterPourcentage(m.resume.couverture) },
+  {
+    libelle: 'Catégorie juste',
+    aide: 'Part des documents rangés dans la bonne catégorie.',
+    valeur: (m) => formaterPourcentage(m.classement.categorie)
+  },
+  {
+    libelle: 'Action requise juste',
+    aide: 'Part des documents pour lesquels l’agent a bien vu s’il faut agir (payer, répondre, signer).',
+    valeur: (m) => formaterPourcentage(m.classement.action)
+  },
+  {
+    libelle: 'Urgence juste',
+    aide: 'Part des documents dont l’urgence (aucune, bientôt, urgente) est la bonne.',
+    valeur: (m) => formaterPourcentage(m.classement.urgence)
+  },
+  {
+    libelle: 'Documents « à vérifier »',
+    aide: 'Part des documents où l’agent hésite : moins il y en a, moins vous avez à relire.',
+    valeur: (m) => formaterPourcentage(m.classement.aVerifier)
+  },
+  {
+    libelle: 'Catégorie juste quand l’agent est sûr',
+    aide: 'Justesse sur les seuls documents qui ne sont pas « à vérifier » : on peut s’y fier sans relire.',
+    valeur: (m) => formaterPourcentage(m.classement.categorieSiSur)
+  },
+  {
+    libelle: 'Recherche : pertinent en tête',
+    aide: 'Part des questions dont le bon document arrive en premier.',
+    valeur: (m) => formaterPourcentage(m.recherche.enTete)
+  },
+  {
+    libelle: 'Recherche : pertinent dans les 3 premiers',
+    aide: 'Part des questions dont le bon document est parmi les trois premiers résultats.',
+    valeur: (m) => formaterPourcentage(m.recherche.dansTop3)
+  },
+  {
+    libelle: 'Recherche : rang réciproque moyen',
+    aide: 'Entre 0 et 1 : 1 si le bon document arrive toujours en premier, 0,5 s’il est deuxième, 0 s’il n’est pas trouvé.',
+    valeur: (m) => formaterNombre(m.recherche.mrr, 2)
+  },
+  {
+    libelle: 'Résumés : faits couverts',
+    aide: 'Part des faits importants attendus (montants, dates, noms) présents dans les résumés.',
+    valeur: (m) => formaterPourcentage(m.resume.couverture)
+  },
   {
     libelle: 'Résumés : longueur moyenne',
+    aide: 'Nombre moyen de mots d’un résumé.',
     valeur: (m) => (m.resume.motsMoyens === null ? TIRET : `${formaterEntier(m.resume.motsMoyens)} mots`)
   },
-  { libelle: 'Temps total du banc', valeur: (m) => formaterDuree(m.temps.totalMs) },
-  { libelle: 'Temps moyen d’un triage', valeur: (m) => formaterDuree(m.temps.triageMoyenMs) },
-  { libelle: 'Temps moyen d’une recherche', valeur: (m) => formaterDuree(m.temps.rechercheMoyenneMs) },
-  { libelle: 'Temps moyen d’un résumé', valeur: (m) => formaterDuree(m.temps.resumeMoyenMs) },
-  { libelle: 'Coût du banc', valeur: (m) => formaterUsd(m.cout.totalUsd) },
-  { libelle: 'Coût estimé pour 1 000 documents', valeur: (m) => formaterUsd(m.cout.pour1000DocumentsUsd) },
-  { libelle: 'Appels hors de la machine', valeur: (m) => formaterEntier(m.confidentialite.appelsHorsMachine) },
-  { libelle: 'Caractères envoyés hors de la machine', valeur: (m) => formaterEntier(m.confidentialite.caracteresEnvoyes) },
-  { libelle: 'Données personnelles masquées', valeur: (m) => formaterEntier(m.confidentialite.elementsMasques) },
+  { libelle: 'Temps total du banc', aide: 'Durée de tout l’examen pour ce mode.', valeur: (m) => formaterDuree(m.temps.totalMs) },
+  { libelle: 'Temps moyen d’un triage', aide: 'Durée moyenne pour classer un document.', valeur: (m) => formaterDuree(m.temps.triageMoyenMs) },
+  {
+    libelle: 'Temps moyen d’une recherche',
+    aide: 'Durée moyenne pour répondre à une question.',
+    valeur: (m) => formaterDuree(m.temps.rechercheMoyenneMs)
+  },
+  { libelle: 'Temps moyen d’un résumé', aide: 'Durée moyenne pour résumer un document.', valeur: (m) => formaterDuree(m.temps.resumeMoyenMs) },
+  {
+    libelle: 'Coût du banc',
+    aide: 'Montant facturé par OpenRouter pendant l’examen ; 0 $ en local.',
+    valeur: (m) => formaterUsd(m.cout.totalUsd)
+  },
+  {
+    libelle: 'Coût estimé pour 1 000 documents',
+    aide: 'Coût probable pour classer et résumer 1 000 documents, d’après l’examen.',
+    valeur: (m) => formaterUsd(m.cout.pour1000DocumentsUsd)
+  },
+  {
+    libelle: 'Appels hors de la machine',
+    aide: 'Nombre d’envois sur Internet pendant l’examen.',
+    valeur: (m) => formaterEntier(m.confidentialite.appelsHorsMachine)
+  },
+  {
+    libelle: 'Caractères envoyés hors de la machine',
+    aide: 'Quantité de texte partie sur Internet pendant l’examen.',
+    valeur: (m) => formaterEntier(m.confidentialite.caracteresEnvoyes)
+  },
+  {
+    libelle: 'Données personnelles masquées',
+    aide: 'Courriels, téléphones, IBAN, cartes et numéros de sécurité sociale remplacés avant l’envoi.',
+    valeur: (m) => formaterEntier(m.confidentialite.elementsMasques)
+  },
   {
     libelle: 'Éléments en erreur',
+    aide: 'Questions de l’examen restées sans réponse : panne, clé refusée, délai dépassé…',
     valeur: (m) => formaterEntier(m.classement.erreurs + m.recherche.erreurs + m.resume.erreurs),
     toujours: true
   }
@@ -66,8 +142,9 @@ const LIGNES: DefinitionLigne[] = [
 
 /** Lignes du tableau de synthèse, une valeur par profil ; « – » pour un mode non terminé. */
 export function lignesSynthese(profils: readonly ResultatProfil[]): LigneSynthese[] {
-  return LIGNES.map(({ libelle, valeur, toujours, importante }) => ({
+  return LIGNES.map(({ libelle, aide, valeur, toujours, importante }) => ({
     libelle,
+    aide,
     valeurs: profils.map((p) => (p.statut === 'termine' || toujours ? valeur(p.metriques, p) : TIRET)),
     ...(importante ? { importante } : {})
   }));

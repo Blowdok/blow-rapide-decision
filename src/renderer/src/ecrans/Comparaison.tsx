@@ -20,7 +20,9 @@ function Resultats({ comparaison }: { comparaison: ResultatComparaison }) {
   return (
     <>
       <section className={`recommandation ${recommandation.profil ? `recommandation-${recommandation.profil}` : ''}`}>
-        <h2>{recommandation.titre}</h2>
+        <h2 data-infobulle="Conclusion de l’examen. Le mode Local reste recommandé tant que l’Hybride ne fait pas nettement mieux.">
+          {recommandation.titre}
+        </h2>
         <ul>
           {recommandation.raisons.map((r) => (
             <li key={r}>{r}</li>
@@ -37,16 +39,20 @@ function Resultats({ comparaison }: { comparaison: ResultatComparaison }) {
         <table className="synthese">
           <thead>
             <tr>
-              <th>Critère</th>
+              <th data-infobulle="Survolez un critère pour savoir ce qu’il mesure.">Critère</th>
               {profils.map((p) => (
-                <th key={p.profil}>{p.libelle}</th>
+                <th key={p.profil} data-infobulle={PROFILS[p.profil].description}>
+                  {p.libelle}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {lignesSynthese(profils).map((ligne) => (
               <tr key={ligne.libelle} className={ligne.importante ? 'importante' : undefined}>
-                <th scope="row">{ligne.libelle}</th>
+                <th scope="row" data-infobulle={ligne.aide}>
+                  {ligne.libelle}
+                </th>
                 {ligne.valeurs.map((v, i) => (
                   <td key={profils[i]?.profil ?? i}>{v}</td>
                 ))}
@@ -63,7 +69,9 @@ function Resultats({ comparaison }: { comparaison: ResultatComparaison }) {
 
       {reference && (
         <details className="bloc">
-          <summary>Classement, document par document</summary>
+          <summary data-infobulle="Ce que chaque mode a répondu pour chaque document, comparé à la bonne réponse : ✓ juste, ✗ faux.">
+            Classement, document par document
+          </summary>
           <div className="table-defilante">
             <table>
               <thead>
@@ -93,16 +101,22 @@ function Resultats({ comparaison }: { comparaison: ResultatComparaison }) {
 
       {resultat.rechercheLexicale.length > 0 && (
         <details className="bloc">
-          <summary>Recherche, requête par requête (rang du document attendu)</summary>
+          <summary data-infobulle="Place du bon document dans les résultats de chaque question : 1 = en tête, « absent » = pas trouvé.">
+            Recherche, requête par requête (rang du document attendu)
+          </summary>
           <div className="table-defilante">
             <table>
               <thead>
                 <tr>
                   <th>Requête</th>
-                  <th>Lexical seul</th>
-                  {fusionnee && <th>Lexical et sémantique</th>}
+                  <th data-infobulle="Recherche par les mots de la question seulement, sans IA pour juger les passages.">Lexical seul</th>
+                  {fusionnee && (
+                    <th data-infobulle="Recherche par les mots et par le sens réunis, sans IA pour juger les passages.">Lexical et sémantique</th>
+                  )}
                   {profils.map((p) => (
-                    <th key={p.profil}>{p.libelle}</th>
+                    <th key={p.profil} data-infobulle={PROFILS[p.profil].description}>
+                      {p.libelle}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -185,11 +199,16 @@ export function EcranComparaison() {
       </p>
 
       <div className="formulaire">
-        <label className="champ">
+        <label className="champ" data-infobulle="Dossier qui contient jeu.json (les bonnes réponses) et les documents d’exemple.">
           <span>Documents d’examen</span>
           <span className="ligne">
             <input type="text" value={jeu} onChange={(e) => definirJeu(e.target.value)} aria-label="Dossier des documents d’examen" />
-            <button type="button" onClick={() => void choisirJeu()} disabled={enCours}>
+            <button
+              type="button"
+              onClick={() => void choisirJeu()}
+              disabled={enCours}
+              data-infobulle="Choisir un autre dossier d’examen, par exemple un jeu fait avec vos propres documents."
+            >
               Choisir…
             </button>
           </span>
@@ -198,23 +217,39 @@ export function EcranComparaison() {
         <fieldset className="champ">
           <legend>Modes à comparer</legend>
           {(Object.keys(PROFILS) as IdProfil[]).map((id) => (
-            <label key={id} className="case" title={PROFILS[id].description}>
+            <label key={id} className="case" data-infobulle={PROFILS[id].description}>
               <input type="checkbox" checked={profils.includes(id)} onChange={() => basculer(id)} disabled={enCours} />
               {PROFILS[id].libelle}
             </label>
           ))}
         </fieldset>
         <div className="actions">
-          <button type="button" className="principal" onClick={() => void lancer()} disabled={enCours || !jeu || profils.length === 0}>
+          <button
+            type="button"
+            className="principal"
+            onClick={() => void lancer()}
+            disabled={enCours || !jeu || profils.length === 0}
+            data-infobulle={
+              profils.length === 0
+                ? 'Cochez d’abord au moins un mode à comparer.'
+                : !jeu
+                  ? 'Indiquez d’abord le dossier des documents d’examen.'
+                  : 'Fait passer l’examen aux modes cochés, l’un après l’autre. Comptez quelques minutes.'
+            }
+          >
             {enCours ? 'Comparaison en cours…' : 'Lancer la comparaison'}
           </button>
           {enCours && (
-            <button type="button" onClick={() => void api.banc.annuler()}>
+            <button type="button" onClick={() => void api.banc.annuler()} data-infobulle="Arrête la comparaison en cours.">
               Annuler
             </button>
           )}
           {comparaison && !enCours && (
-            <button type="button" onClick={() => void exporter()}>
+            <button
+              type="button"
+              onClick={() => void exporter()}
+              data-infobulle="Enregistre le rapport (Markdown) et ses données (JSON) à l’endroit de votre choix."
+            >
               Exporter le rapport…
             </button>
           )}

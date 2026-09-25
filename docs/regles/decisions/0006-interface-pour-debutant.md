@@ -1,6 +1,9 @@
 # RAD 0006 — L'interface s'adresse à un débutant
 
-Date : 25 septembre 2026. Décision de Blowdok : « L'interface doit être intuitive pour qu'un débutant novice puisse utiliser ».
+Date : 25 septembre 2026. Décisions de Blowdok :
+
+- « L'interface doit être intuitive pour qu'un débutant novice puisse utiliser » ;
+- puis : « N'oublie pas les bulles d'informations au survol des boutons, icônes, libellé...etc. on doit comprendre tout suite c'est pourquoi ».
 
 ## Contexte
 
@@ -20,7 +23,7 @@ Date : 25 septembre 2026. Décision de Blowdok : « L'interface doit être intui
 - **Vocabulaire simple dans l'interface** :
   - « Classer » plutôt que « trier », « Actualiser » et « lecture du dossier » plutôt qu'« indexer » ;
   - « Action à faire », « Répond à la question » ;
-  - « Trouvé par les mots » ou « par le sens » à la place des rangs, gardés dans l'infobulle ;
+  - « Trouvé par les mots » ou « par le sens » à la place des rangs, gardés dans la bulle d'information ;
   - « ce PC », « sur Internet », « gratuit ».
 
   Le code, la ligne de commande et les rapports du banc gardent leurs termes techniques.
@@ -28,6 +31,11 @@ Date : 25 septembre 2026. Décision de Blowdok : « L'interface doit être intui
   - l'essentiel d'abord : préparation, clé OpenRouter, confidentialité, options ;
   - modèles, seuils, catégories et paramètres techniques n'apparaissent qu'avec « Afficher les réglages avancés », un choix mémorisé ;
   - la barre « Enregistrer » reste visible et signale les modifications à enregistrer.
+- **Bulles d'information** :
+  - chaque bouton, champ, lien, pastille, titre de colonne et critère de la Comparaison dit à quoi il sert, dans une bulle ;
+  - elle s'ouvre au survol, après un quart de seconde, et tout de suite au clavier ;
+  - une seule bulle est posée au-dessus de tout, et les lecteurs d'écran la lisent comme description de l'élément ;
+  - un élément la déclare par l'attribut `data-infobulle`. Un test de bout en bout vérifie, écran par écran, qu'aucun élément visible avec lequel on agit n'en manque.
 - **Guidage pas à pas** :
   - l'étape suivante est indiquée (« Classer les N documents ») et les documents « à vérifier » sont signalés ;
   - la recherche propose trois questions d'exemple cliquables ;

@@ -16,7 +16,11 @@ function Commande({ texte }: { texte: string }) {
   return (
     <div className="commande">
       <code>{texte}</code>
-      <button type="button" onClick={() => void copier()}>
+      <button
+        type="button"
+        onClick={() => void copier()}
+        data-infobulle="Copie la commande. Collez-la ensuite dans le terminal : clic droit, ou Ctrl+V."
+      >
         {copiee ? 'Copiée' : 'Copier'}
       </button>
     </div>
@@ -27,7 +31,7 @@ function Commande({ texte }: { texte: string }) {
 function Question({ id, titre, ouverte, children }: { id: string; titre: string; ouverte: boolean; children: ReactNode }) {
   return (
     <details id={`aide-${id}`} className="question" open={ouverte}>
-      <summary>{titre}</summary>
+      <summary data-infobulle="Cliquez pour afficher ou masquer la réponse.">{titre}</summary>
       <div className="reponse">{children}</div>
     </details>
   );
@@ -46,7 +50,7 @@ export function EcranAide() {
   const seuil = Math.round((etat?.reglages.classement.seuilConfiance ?? 0.6) * 100);
   const ouverte = (id: string): boolean => id === sujet;
   const lien = (cible: 'documents' | 'recherche' | 'comparaison' | 'reglages', texte: string) => (
-    <button type="button" className="lien" onClick={() => allerA(cible)}>
+    <button type="button" className="lien" onClick={() => allerA(cible)} data-infobulle={`Ouvre l’écran ${texte}.`}>
       {texte}
     </button>
   );
@@ -55,6 +59,9 @@ export function EcranAide() {
     <section className="ecran ecran-aide" key={sujet}>
       <h1>Aide</h1>
       <p className="consigne">Les réponses aux questions les plus courantes, pour bien démarrer. Cliquez sur une question pour l’ouvrir.</p>
+      <p className="indice">
+        Astuce : survolez un bouton, une pastille ou un titre de colonne avec la souris. Une bulle explique à quoi il sert.
+      </p>
 
       <Question id="debut" titre="Par où commencer ?" ouverte={ouverte('debut')}>
         <ol>
@@ -94,7 +101,7 @@ export function EcranAide() {
         <ol>
           <li>
             Téléchargez Ollama sur{' '}
-            <a href="https://ollama.com/download" target="_blank" rel="noreferrer">
+            <a href="https://ollama.com/download" target="_blank" rel="noreferrer" data-infobulle="Ouvre le site dans votre navigateur.">
               ollama.com/download
             </a>
             , installez-le, puis lancez-le.
@@ -113,14 +120,14 @@ export function EcranAide() {
         <ol>
           <li>
             Créez un compte sur{' '}
-            <a href="https://openrouter.ai" target="_blank" rel="noreferrer">
+            <a href="https://openrouter.ai" target="_blank" rel="noreferrer" data-infobulle="Ouvre le site dans votre navigateur.">
               openrouter.ai
             </a>{' '}
             et ajoutez un peu de crédit (quelques dollars suffisent pour commencer).
           </li>
           <li>
             Créez une clé dans{' '}
-            <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">
+            <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" data-infobulle="Ouvre le site dans votre navigateur.">
               openrouter.ai/keys
             </a>{' '}
             et copiez-la.
