@@ -32,21 +32,21 @@ Mise à jour : 25 septembre 2026. À lire au début de chaque session, à mettre
   - limite de pages consommée par les pages blanches.
 - 25 septembre 2026, à la demande de Blowdok, la PR #1 est fusionnée dans `main`.
 - 25 septembre 2026, à la demande de Blowdok (« N'oublie pas les bulles d'informations au survol des boutons, icônes, libellé… »), chaque bouton, champ, lien, pastille et critère s'explique dans une bulle ([RAD 0006](decisions/0006-interface-pour-debutant.md)). À sa demande, ce travail est fusionné dans `main` (PR #2).
-- Vérifications : typage, 166 tests unitaires, les 9 étapes du parcours de bout en bout de l'application et les 4 étapes du parcours des options (face à un faux serveur Ollama) passent. Les parcours vérifient, écran par écran, qu'aucun élément avec lequel on agit n'est sans bulle.
-- Aucun essai réel avec Ollama, OpenRouter ou Jev : l'environnement de construction n'avait ni serveur Ollama ni clé API. Seuls le mode référence et des réponses simulées au format documenté ont tourné.
+- 25 septembre 2026, après le signalement d’une clé refusée sous Hyprland, Electron sélectionne `gnome-libsecret` uniquement dans cet environnement; le refus de stockage en clair reste en place ([RAD 0007](decisions/0007-trousseau-hyprland.md)). Aucune clé réelle n’a été saisie.
+- 25 septembre 2026, Blowdok a précisé que « classer » devait conduire à un rangement concret. L’écran Documents propose maintenant un aperçu éditable, envoie les résultats incertains vers « À vérifier », puis crée une copie rangée avec un bilan CSV; les sources ne sont jamais déplacées ([RAD 0008](decisions/0008-copie-classee-apres-validation.md)).
+- Vérifications : `npm run typecheck`, 176 tests unitaires, compilation de production et 13 tests E2E passent; la copie du corpus de démonstration est testée et les originaux restent présents.
+- Aucun appel réel à Jev/OpenRouter ni aucun document personnel n’a été utilisé pour cette livraison. La qualité de Jev sur les documents de Blowdok et son coût restent à évaluer après accord pour l’envoi et la dépense. Les modifications sont sur la branche `fonction/rangement-documentaire-valide` et restent à fusionner dans `main`.
 
 ## Prochaine action
 
-1. Sur le PC de Blowdok : `npm install`, clé OpenRouter dans les réglages, puis `npm run brd -- diagnostic` ; `qwen3.5:4b` y est déjà installé.
-2. Lancer la comparaison des trois modes sur le jeu de démonstration et relire le rapport, en particulier la qualité de Jev en français. Si les résumés hybrides échouent sur la confidentialité (Qwen3.8 Flash n'a qu'un fournisseur), choisir entre décocher le refus de collecte et changer de modèle.
-3. Comparer les autres petits modèles locaux (`gemma3:4b`, `granite4.2:3b`, `gemma4:e2b`) en changeant le modèle dans Réglages puis en relançant la comparaison.
-4. Constituer un jeu d'évaluation de 20 à 50 vrais documents représentatifs, puis trancher local ou hybride avec le banc.
-5. Valider la tolérance de 5 points et les critères du banc ([RAD 0004](decisions/0004-banc-de-decision.md)).
-6. Faire suivre l'accueil en trois étapes à un vrai débutant, sans aide, et noter où il bloque ([RAD 0006](decisions/0006-interface-pour-debutant.md)).
-7. Essayer les options sur le PC de Blowdok ([RAD 0005](decisions/0005-options-semantique-et-ocr.md)) :
-   - cocher la recherche par le sens, « Actualiser » le dossier, relancer la Comparaison et lire la ligne « Lexical et sémantique » du rapport ;
-   - comparer `embeddinggemma` et `nomic-embed-text-v2-moe` ;
-   - lire quelques vrais PDF scannés avec `minicpm-v4.6:1b` et juger la transcription en français.
+1. Fusionner `fonction/rangement-documentaire-valide` dans `main` après revue.
+2. Sur le PC de Blowdok, lancer `npm run dev`, ouvrir le jeu fictif de 12 documents en mode « Référence sans IA », préparer la copie vers un dossier temporaire et vérifier le bilan CSV ainsi que l’intégrité des sources.
+3. Si Blowdok veut évaluer Jev, saisir la clé OpenRouter dans les réglages de l’application, lancer le diagnostic, puis autoriser explicitement l’envoi et le coût avant tout essai Hybride. Commencer par le jeu fictif; aucune clé dans le chat.
+4. Comparer les trois modes sur le jeu de démonstration et juger la qualité des décisions de Jev en français, son coût et les résultats « à vérifier ». Si Jev ne bat pas clairement le modèle local ou la référence, ne pas le retenir pour le tri réel.
+5. N’essayer le mode Hybride sur des documents personnels qu’après accord explicite sur les données envoyées et la dépense; vérifier l’aperçu, corriger les destinations, puis confirmer la copie.
+6. Comparer les autres petits modèles locaux (`gemma3:4b`, `granite4.2:3b`, `gemma4:e2b`) dans Réglages et le banc.
+7. Constituer, si Blowdok l’autorise, un jeu d’évaluation représentatif de 20 à 50 documents, puis valider la tolérance de 5 points et les critères du banc ([RAD 0004](decisions/0004-banc-de-decision.md)).
+8. Faire suivre l’accueil en trois étapes à un débutant sans aide ([RAD 0006](decisions/0006-interface-pour-debutant.md)) et essayer les options locales ([RAD 0005](decisions/0005-options-semantique-et-ocr.md)).
 
 ## Décisions
 
@@ -56,3 +56,5 @@ Mise à jour : 25 septembre 2026. À lire au début de chaque session, à mettre
 - [RAD 0004 — Un banc de décision tranche entre local et hybride](decisions/0004-banc-de-decision.md).
 - [RAD 0005 — Recherche sémantique et lecture des PDF scannés, en options locales](decisions/0005-options-semantique-et-ocr.md).
 - [RAD 0006 — L'interface s'adresse à un débutant](decisions/0006-interface-pour-debutant.md).
+- [RAD 0007 — Utiliser Secret Service sous Hyprland pour protéger les clés](decisions/0007-trousseau-hyprland.md).
+- [RAD 0008 — Prévisualiser puis créer une copie rangée](decisions/0008-copie-classee-apres-validation.md).

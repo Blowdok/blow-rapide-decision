@@ -13,17 +13,21 @@ import { listerModelesOllama } from '../coeur/moteurs/ollama';
 import { optionsFacultatives } from '../coeur/options';
 import type { CacheTexte } from '../coeur/outils/cache';
 import { executerParLots } from '../coeur/outils/concurrence';
+import { CATEGORIE_A_VERIFIER } from '../partage/contrat';
 import type {
+  AffectationRangement,
   DetailDocument,
   EntreeJournal,
   EtatCorpus,
   EtatService,
   Progression,
   ResultatComparaison,
+  ResultatRangement,
   ResumeDocument
 } from '../partage/contrat';
 import type { Reglages, Secrets } from '../partage/reglages';
 import type { DocumentIndexe, IdProfil, Mesure, Recherche, Resume, Triage } from '../partage/types';
+import { copierFichiersClasses } from './rangement';
 
 export interface DependancesService {
   reglages(): Reglages;
@@ -56,6 +60,13 @@ function signatureRedaction(r: Reglages): string {
   return `${r.profil}|${moteur}|${JSON.stringify(r.resume)}`;
 }
 
+function celluleCsv(valeur: string | number): string {
+  let texte = String(valeur);
+  const debut = texte.trimStart();
+  if (['=', '+', '-', '@'].some((prefixe) => debut.startsWith(prefixe))) texte = `'${texte}`;
+  return `"${texte.replace(/"/g, '""')}"`;
+}
+
 export class ServiceAgent {
   readonly #deps: DependancesService;
   #corpus: Corpus | null = null;
@@ -65,6 +76,7 @@ export class ServiceAgent {
   #banc: ResultatComparaison | null = null;
   #annulation: AbortController | null = null;
   #indexation: AbortController | null = null;
+  #dernierRangement: string | null = null;
   /** Vecteurs des passages déjà calculés : une réindexation ne recalcule que les passages changés. */
   readonly #memoirePlongements = new Map<string, Float32Array>();
 
@@ -199,6 +211,74 @@ export class ServiceAgent {
       this.#deps.envoyer({ type: 'triage', fait: ++fait, total: cibles.length });
       return triage;
     });
+  }
+
+  /** Crée une copie classée, après validation des catégories et du triage du mode actif. */
+  async copierClassement(parentDestination: string, affectations: AffectationRangement[]): Promise<ResultatRangement> {
+    const corpus = this.#corpusOuvert();
+    const reglages = this.#deps.reglages();
+    const categories = new Map(reglages.classement.categories.map((categorie) => [categorie.id, categorie.libelle]));
+    const affectationsParId = new Map(affectations.map((affectation) => [affectation.documentId, affectation.categorie]));
+    if (affectationsParId.size !== affectations.length || affectations.length !== corpus.documents.length) {
+      throw new Error('Chaque document doit avoir une seule destination. Actualisez l’aperçu puis recommencez.');
+    }
+
+    const signature = signatureDecision(reglages);
+    const fichiers = corpus.documents.map((document) => {
+      const triage = this.#triages.get(`${signature}|${document.id}`);
+      if (!triage) throw new Error('Classez d’abord tous les documents avec le mode actuellement sélectionné.');
+      const categorieChoisie = affectationsParId.get(document.id);
+      if (!categorieChoisie) throw new Error(`Destination manquante pour « ${document.nom} ».`);
+      const categorie = categorieChoisie === CATEGORIE_A_VERIFIER ? 'À vérifier' : categories.get(categorieChoisie);
+      if (!categorie) throw new Error(`Catégorie inconnue pour « ${document.nom} ». Actualisez l’aperçu.`);
+      return {
+        cheminSource: document.chemin,
+        cheminRelatif: document.id,
+        categorie,
+        taille: document.taille,
+        modifieLe: document.modifieLe
+      };
+    });
+
+    const lignesRapport = corpus.documents.map((document) => {
+      const triage = this.#triages.get(`${signature}|${document.id}`);
+      if (!triage) throw new Error('Classez d’abord tous les documents avec le mode actuellement sélectionné.');
+      const categorieChoisie = affectationsParId.get(document.id);
+      if (!categorieChoisie) throw new Error(`Destination manquante pour « ${document.nom} ».`);
+      const categorieFinale =
+        categorieChoisie === CATEGORIE_A_VERIFIER ? 'À vérifier' : categories.get(categorieChoisie);
+      if (!categorieFinale) throw new Error(`Catégorie inconnue pour « ${document.nom} ». Actualisez l’aperçu.`);
+      const mesure = triage.mesures.at(-1);
+      const moteur = mesure?.moteur ?? (triage.profil === 'hybride' ? 'Jev' : triage.profil === 'local' ? 'Ollama' : 'Référence');
+      const modele = mesure?.modele ?? 'Sans modèle';
+      const cout = triage.mesures.reduce((total, element) => total + element.coutUsd, 0);
+      return [
+        document.id,
+        categories.get(triage.categorie) ?? triage.categorie,
+        categorieFinale,
+        triage.actionRequise ? 'Oui' : 'Non',
+        triage.urgence,
+        Math.round(triage.confiance * 100),
+        moteur,
+        modele,
+        cout
+      ]
+        .map(celluleCsv)
+        .join(';');
+    });
+    const rapportCsv = [
+      ['Chemin du document', 'Catégorie proposée', 'Dossier choisi', 'Action requise', 'Urgence (0 à 2)', 'Confiance (%)', 'Moteur', 'Modèle', 'Coût USD']
+        .map(celluleCsv)
+        .join(';'),
+      ...lignesRapport
+    ].join('\n') + '\n';
+    const resultat = await copierFichiersClasses({ dossierSource: corpus.dossier, parentDestination, fichiers, rapportCsv });
+    this.#dernierRangement = resultat.dossierDestination;
+    return resultat;
+  }
+
+  get dernierRangement(): string | null {
+    return this.#dernierRangement;
   }
 
   async resumer(id: string): Promise<Resume> {

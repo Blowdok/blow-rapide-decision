@@ -5,7 +5,7 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { app, type BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent, shell } from 'electron';
 import { nomDuRapport } from '../coeur/banc/rapport';
-import { CANAUX, type EtatReglages, type NomCle, type Reponse } from '../partage/contrat';
+import { CANAUX, type AffectationRangement, type EtatReglages, type NomCle, type Reponse } from '../partage/contrat';
 import { IDS_PROFILS, type ReglagesPartiels, type Secrets, type Theme } from '../partage/reglages';
 import type { IdProfil } from '../partage/types';
 import type { ServiceAgent } from './service';
@@ -40,6 +40,17 @@ function listeProfils(valeur: unknown): IdProfil[] {
 function nomCle(valeur: unknown): NomCle {
   if (valeur !== 'cleOpenRouter' && valeur !== 'cleTypeSafe') throw new Error('Nom de clé invalide.');
   return valeur;
+}
+
+function affectationsRangement(valeur: unknown): AffectationRangement[] {
+  if (!Array.isArray(valeur)) throw new Error('Liste de destinations invalide.');
+  return valeur.map((element) => {
+    const entree = objet(element, 'destination');
+    return {
+      documentId: texte(entree.documentId, 'document'),
+      categorie: texte(entree.categorie, 'catégorie')
+    };
+  });
 }
 
 export function brancherCanaux(options: OptionsCanaux): void {
@@ -114,6 +125,17 @@ export function brancherCanaux(options: OptionsCanaux): void {
   gerer(CANAUX.documentOuvrir, async (id) => {
     // Seuls les fichiers du dossier indexé peuvent être ouverts.
     const erreur = await shell.openPath(service.cheminDocument(texte(id, 'document')));
+    if (erreur) throw new Error(`Ouverture impossible : ${erreur}`);
+  });
+
+  gerer(CANAUX.rangementChoisirDestination, () => choisirDossier('Dossier où créer la copie rangée'));
+  gerer(CANAUX.rangementCopier, (parent, affectations) =>
+    service.copierClassement(texte(parent, 'dossier de destination'), affectationsRangement(affectations))
+  );
+  gerer(CANAUX.rangementOuvrir, async () => {
+    const destination = service.dernierRangement;
+    if (!destination) throw new Error('Aucune copie rangée à ouvrir.');
+    const erreur = await shell.openPath(destination);
     if (erreur) throw new Error(`Ouverture impossible : ${erreur}`);
   });
 

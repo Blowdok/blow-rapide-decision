@@ -990,3 +990,68 @@ p[data-infobulle],
 div.marque[data-infobulle] {
   cursor: help;
 }
+
+/* Prévisualisation et compte rendu du rangement non destructif. */
+.apercu-rangement {
+  background: var(--surface);
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon);
+  padding: 1rem;
+  box-shadow: var(--ombre);
+}
+
+.rangement-entete {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.rangement-entete h2 {
+  margin-bottom: 0.25rem;
+}
+
+.rangement-entete p {
+  margin-top: 0;
+}
+
+.rangement-table {
+  max-height: 360px;
+}
+
+.rangement-table table {
+  min-width: 720px;
+}
+
+.rangement-table select {
+  width: 100%;
+  min-width: 160px;
+}
+
+.rangement-emplacement {
+  overflow-wrap: anywhere;
+  background: var(--surface-2);
+  border-radius: var(--rayon);
+  padding: 0.5rem 0.75rem;
+}
+
+.rangement-resultat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.rangement-resultat p {
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .rangement-entete,
+  .rangement-resultat {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

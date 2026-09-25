@@ -19,6 +19,9 @@ export const CANAUX = {
   documentsTrier: 'documents:trier',
   documentResumer: 'document:resumer',
   documentOuvrir: 'document:ouvrir',
+  rangementChoisirDestination: 'rangement:choisir-destination',
+  rangementCopier: 'rangement:copier',
+  rangementOuvrir: 'rangement:ouvrir',
   rechercher: 'recherche:lancer',
   bancJeuParDefaut: 'banc:jeu-par-defaut',
   bancChoisirJeu: 'banc:choisir-jeu',
@@ -91,6 +94,19 @@ export interface EntreeJournal {
   coutUsd: number;
 }
 
+/** Affectation vérifiée par Blowdok avant la création d'une copie rangée. */
+export interface AffectationRangement {
+  documentId: string;
+  categorie: string;
+}
+
+export const CATEGORIE_A_VERIFIER = '__a_verifier__';
+
+export interface ResultatRangement {
+  dossierDestination: string;
+  fichiersCopies: number;
+}
+
 export interface ResultatComparaison {
   resultat: ResultatBanc;
   rapport: string;
@@ -134,6 +150,11 @@ export interface ApiBureau {
     trier(ids?: string[]): Promise<Triage[]>;
     resumer(id: string): Promise<Resume>;
     ouvrir(id: string): Promise<void>;
+  };
+  rangement: {
+    choisirDestination(): Promise<string | null>;
+    copier(parentDestination: string, affectations: AffectationRangement[]): Promise<ResultatRangement>;
+    ouvrirDernier(): Promise<void>;
   };
   rechercher(requete: string): Promise<Recherche>;
   banc: {

@@ -2,7 +2,7 @@
 // `window.brd`, et rien d'autre.
 
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
-import { type ApiBureau, CANAUX, type Progression, type Reponse } from '../partage/contrat';
+import { type AffectationRangement, type ApiBureau, CANAUX, type Progression, type Reponse } from '../partage/contrat';
 
 async function appeler<T>(canal: string, ...args: unknown[]): Promise<T> {
   const reponse = (await ipcRenderer.invoke(canal, ...args)) as Reponse<T>;
@@ -31,6 +31,12 @@ const api: ApiBureau = {
     trier: (ids) => appeler(CANAUX.documentsTrier, ids),
     resumer: (id) => appeler(CANAUX.documentResumer, id),
     ouvrir: (id) => appeler(CANAUX.documentOuvrir, id)
+  },
+  rangement: {
+    choisirDestination: () => appeler(CANAUX.rangementChoisirDestination),
+    copier: (parentDestination: string, affectations: AffectationRangement[]) =>
+      appeler(CANAUX.rangementCopier, parentDestination, affectations),
+    ouvrirDernier: () => appeler(CANAUX.rangementOuvrir)
   },
   rechercher: (requete) => appeler(CANAUX.rechercher, requete),
   banc: {
