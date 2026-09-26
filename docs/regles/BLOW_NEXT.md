@@ -36,6 +36,7 @@ Mise à jour : 25 septembre 2026. À lire au début de chaque session, à mettre
 - 25 septembre 2026, Blowdok a précisé que « classer » devait conduire à un rangement concret. L’écran Documents propose maintenant un aperçu éditable, envoie les résultats incertains vers « À vérifier », puis crée une copie rangée avec un bilan CSV; les sources ne sont jamais déplacées ([RAD 0008](decisions/0008-copie-classee-apres-validation.md)).
 - Vérifications : `npm run typecheck`, 176 tests unitaires, compilation de production et 13 tests E2E passent; la copie du corpus de démonstration est testée et les originaux restent présents.
 - Aucun appel réel à Jev/OpenRouter ni aucun document personnel n’a été utilisé pour cette livraison. La qualité de Jev sur les documents de Blowdok et son coût restent à évaluer après accord pour l’envoi et la dépense. Les changements de cette livraison ont été fusionnés en fast-forward dans `main` et poussés sur `origin/main`.
+- 25 septembre 2026, essai depuis un clone neuf : `npm start` échouait (« Electron uninstall »), car Electron 44 ne télécharge plus son binaire à l'installation. Désormais, `npm install` le télécharge, et `npm run dev` ou `npm start` le vérifient avant de démarrer. Après ce correctif, `git clone`, `npm install` puis `npm start` ouvrent l'application.
 
 ## Prochaine action
 

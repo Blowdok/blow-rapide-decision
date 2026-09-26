@@ -75,6 +75,11 @@ Chaque appel de moteur renvoie une `Mesure` : durée, jetons, coût, caractères
 - Mode hybride : masquage des identifiants personnels avant envoi, marqueurs restaurés sur la machine ; fournisseurs OpenRouter qui collectent les données exclus par défaut.
 - Options : avec un Ollama sur une autre machine, plongements et pages scannées comptent comme des envois hors de la machine et entrent au journal. Le texte lu par OCR est gardé dans le dossier de données de l'application, sous des noms d'empreinte.
 
+## Installation
+
+- `npm install` télécharge aussi le binaire d'Electron, par le script `postinstall` (`install-electron`). Depuis Electron 44, le paquet ne le fait plus lui-même, et electron-vite refuse de démarrer sans lui (« Electron uninstall »).
+- `npm run dev` et `npm start` rappellent `install-electron` avant de démarrer : une installation faite sans ce script se répare d'elle-même. Le script ne refait rien si le binaire est déjà là.
+
 ## Tests
 
 - `npm test` : cœur, moteurs (réseau simulé), options (plongements et OCR simulés), agent, banc, ligne de commande, service, rangement et stockage.

@@ -44,13 +44,16 @@ L'interface s'adresse à un débutant ([RAD 0006](docs/regles/decisions/0006-int
 
 ## Installation
 
-Prérequis : Node.js 22.12 ou plus récent.
+Prérequis : [Node.js](https://nodejs.org) 22.12 ou plus récent, et [Git](https://git-scm.com).
 
 ```bash
-npm install
+git clone https://github.com/Blowdok/blow-rapide-decision.git
+cd blow-rapide-decision
+npm install    # télécharge aussi Electron, une centaine de Mo, une seule fois
+npm start      # construit puis ouvre l'application
 ```
 
-Au premier lancement, Electron télécharge son binaire.
+Au lancement, l'accueil vérifie ce qui manque pour le mode choisi et dit quoi faire. Il n'y a pas encore d'installeur, ni sous Linux ni sous Windows : l'application se lance depuis ce dossier, avec `npm start`. Après une mise à jour (`git pull`), relancer `npm install` puis `npm start`.
 
 **Mode local** : installer [Ollama](https://ollama.com) (0.12.11 ou plus récent, pour les probabilités des décisions), puis le modèle par défaut, s'il n'est pas déjà là :
 
